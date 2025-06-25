@@ -3,18 +3,20 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
+	// Consult https://svelte.dev/docs/kit/integrations
+	// for more information about preprocessors
 	preprocess: vitePreprocess(),
 
 	kit: {
 		adapter: adapter({
-			fallback: 'index.html', // ✅ This is required for SPA routing
+			fallback: 'index.html',
 		}),
 		paths: {
-			base: '' // ✅ Remove this if it's not needed
+			base: ''
 		},
-		prerender: {
-			handleMissingId: 'warn' // ✅ Ensures missing routes won't break the build
-		}
+		alias: {
+			"@/*": "./path/to/lib/*",
+		  },
 	}
 };
 
