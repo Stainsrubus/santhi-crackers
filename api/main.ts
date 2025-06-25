@@ -46,7 +46,7 @@ app.ws("/api/admin/ws", {
 app.listen(
   {
     port: Number(process.env.PORT) || 4000,
-    hostname:"localhost"
+    hostname:"0.0.0.0"
   },
   ({ hostname, port }) => {
     console.log(`🚀 Server running at http://${hostname}:${port}`);
