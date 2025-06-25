@@ -27,6 +27,8 @@ import { comboOfferController } from "./combo-controller";
 import { offerController } from "./offer-controller";
 import { demandController } from "./demand-controller";
 import { adminEmpOrderController } from "./empOrder-controller";
+import { unitController } from "./unit-controller";
+import { groupController } from "./group-controller";
 
 const adminController = new Elysia({
   prefix: "/admin",
@@ -78,10 +80,12 @@ const adminController = new Elysia({
   .use(reportController)
   .use(configController)
   .use(termsAndConditionsController)
+  .use(unitController)
 .use(quoteController)
 .use(brandsController)
 .use(employeeController)
 .use(comboOfferController)
 .use(offerController)
 .use(adminEmpOrderController)
+.use(groupController)
 export { adminController };

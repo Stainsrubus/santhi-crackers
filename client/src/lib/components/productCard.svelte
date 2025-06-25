@@ -14,14 +14,16 @@
   export let name: string;
   export let available: boolean = true;
   export let MRP: number;
-  export let strikePrice: number;
+  export let unit: string ;
+  // export let strikePrice: number;
   export let id: string | number;
   export let favorite: boolean = false;
   export let comboOffer: boolean = false;
   export let offerType: string | null = null;
 
+
   // Calculate savings
-  $: savings = strikePrice > MRP ? strikePrice - MRP : 0;
+  // $: savings = strikePrice > MRP ? strikePrice - MRP : 0;
 
   // Compute card width class based on route for mobile screens
   $: cardWidthClass = $page.url.pathname === '/' ||
@@ -41,6 +43,7 @@
       }
     }
   }
+  // console.log(unit)
 
   // Handle favorite toggle
   async function handleFavorite() {
@@ -72,7 +75,7 @@
         toast.error(response.data.message || 'Failed to toggle favorite');
       }
     } catch (error: any) {
-      console.error('Failed to toggle favorite:', error);
+      // console.error('Failed to toggle favorite:', error);
       if (error.response?.status === 401) {
         toast.error('Session expired. Please log in again.');
         localStorage.removeItem('token');
@@ -131,6 +134,7 @@
   function handleAddToCart() {
     $addToCartMutation.mutate();
   }
+
 </script>
 
 <div
@@ -151,7 +155,7 @@
   {/if} -->
 
   <!-- Product Image with Overlay and Icons -->
-  <div class="relative md:h-48  h-32  flex justify-center items-center">
+  <div class="relative md:h-48 h-40 flex justify-center items-center">
     <img
       class="object-cover max-h-full max-w-full"
       src={imgUrl + image}
@@ -201,9 +205,9 @@
 
     <!-- Price Section -->
     <div class="flex items-center gap-2 mt-1">
-      <span class="text-[#565555] md:text-base font-medium text-sm">₹{MRP}/box</span>
-      {#if strikePrice > MRP}
-        <span class="text-[#848484] md:text-sm text-xs line-through">₹{strikePrice}</span>
+      <span class="text-[#565555] md:text-base font-medium text-sm">₹{Math.round(MRP - (MRP * (discount || 0) / 100))}</span> <span>/ {unit}</span>
+      {#if discount}
+        <span class="text-[#848484] md:text-sm text-xs line-through">₹{MRP}</span>
       {/if}
     </div>
 

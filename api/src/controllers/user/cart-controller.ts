@@ -34,7 +34,7 @@ export const userCartController = new Elysia({
       status: "active",
     }).populate({
       path: "products.productId",
-      select: "productName comboName comboPrice price images gst stock discount onMRP strikePrice flat negMOQ HSNCode",
+      select: "productName comboName comboPrice price images gst stock discount",
     });
 
     if (!cart) {
@@ -46,166 +46,28 @@ export const userCartController = new Elysia({
       return { message: "User not found", status: false };
     }
 
-    // Get all active flat offers
-    const flatOffers = await FlatOffer.find().populate('items.productId').lean();
-
-    // Create a map of product IDs to their active flat offer status
-    const productFlatStatus = new Map<string, boolean>();
-    flatOffers.forEach(offer => {
-      offer.items.forEach(item => {
-        if (item.active !== false && item.productId) {
-          const productId = item.productId._id.toString();
-          productFlatStatus.set(productId, true);
-        }
-      });
-    });
-
-    // Handle null or unpopulated productId (existing logic)
-    for (let i = 0; i < cart.products.length; i++) {
-      const product = cart.products[i];
-      //@ts-ignore
-      if (!product.productId || !product.productId.productName) {
-        //@ts-ignore
-        const rawId = product._id.toString();
-        const cartItem = await CartModel.findOne(
-          { "products._id": rawId },
-          { "products.$": 1 }
-        );
-        const actualId = cartItem?.products?.[0]?.productId;
-
-        const combo = await ComboOffer.findById(actualId);
-        if (combo) {
-          const fakeProduct: any = {
-            _id: combo._id,
-            productName: combo.comboName,
-            price: combo.comboPrice,
-            strikePrice: combo.strikePrice,
-            images: [combo.image],
-            gst: 0,
-            discount: 0,
-            onMRP: 0,
-            flat: 0, // Combos don't have flat offers
-            isCombo: true,
-            comboDescription: combo.comboDescription,
-            productsIncluded: combo.productsIncluded,
-          };
-          //@ts-ignore
-          cart.products[i].productId = fakeProduct;
-        }
-      }
-    }
-
-    let totalTax = 0;
     let subtotal = 0;
+    let totalTax = 0;
     let totalDiscount = 0;
-    let subtotalBeforeDiscount = 0;
 
-    // Filter products that have active flat offers
-    const flatEligibleProducts = cart.products.filter((p) => {
-      const productId = (p as any).productId?._id?.toString();
-      const hasFlatValue = (p as any).productId?.flat > 0;
-
-      // Check if product is in any active flat offer
-      const isInActiveFlatOffer = productFlatStatus.get(productId) || false;
-
-      return hasFlatValue && isInActiveFlatOffer;
-    });
-
-    const shouldApplyFlatOffers = flatEligibleProducts.length >= 2;
-
-    // Create a deep copy of the cart for response (to avoid modifying the DB version)
-    const responseCart = JSON.parse(JSON.stringify(cart));
-
-    for (const product of responseCart.products) {
+    // Calculate subtotal, tax, and discount
+    for (const product of cart.products) {
       let _product = product as any;
       let basePrice = _product.productId?.price || 0;
       let finalPrice = basePrice;
 
-      subtotalBeforeDiscount += basePrice * _product.quantity;
-
-      const productId = _product.productId?._id?.toString();
-      const isFlatEligible = productFlatStatus.get(productId) && (_product.productId?.flat > 0);
-
-      const existingOfferType = _product.selectedOffer?.offerType;
-
-      const shouldPreserveOffer =
-        existingOfferType === "onMRP" ||
-        existingOfferType === "Negotiate" ||
-        existingOfferType === "Discount";
-
-      if (!shouldPreserveOffer) {
-        _product.selectedOffer = undefined;
-      }
-
-      if (isFlatEligible && shouldApplyFlatOffers && !shouldPreserveOffer) {
-        const flatDiscountPercent = _product.productId.flat;
-        const flatDiscountAmount = basePrice * (flatDiscountPercent / 100);
-        finalPrice = basePrice - flatDiscountAmount;
-        totalDiscount += flatDiscountAmount * _product.quantity;
-
-        _product.selectedOffer = {
-          offerType: "Flat",
-          flatAmount: flatDiscountAmount,
-          discount: flatDiscountPercent,
-          _id: new mongoose.Types.ObjectId().toString(),
-        };
-      } else if (!isFlatEligible || !shouldApplyFlatOffers) {
-        // If flat offer is inactive, set flat to 0 in response only
-        if (_product.productId?.flat > 0 && !productFlatStatus.get(productId)) {
-          _product.productId.flat = 0;
-        }
-
-        if (_product.selectedOffer && shouldPreserveOffer) {
-          const { offerType } = _product.selectedOffer;
-
-          switch (offerType) {
-            case "Discount":
-              const discountPercent = _product.selectedOffer.discount || 0;
-              const discountAmount = basePrice * (discountPercent / 100);
-              finalPrice = basePrice - discountAmount;
-              totalDiscount += discountAmount * _product.quantity;
-              break;
-
-            case "Negotiate":
-              const negotiatedPrice =
-                _product.selectedOffer.negotiate?.negotiatedPrice;
-              if (negotiatedPrice && negotiatedPrice < basePrice) {
-                finalPrice = negotiatedPrice;
-                totalDiscount +=
-                  (basePrice - negotiatedPrice) * _product.quantity;
-              }
-              break;
-
-            case "onMRP":
-              finalPrice = basePrice;
-              break;
-          }
-        } else {
-          const attempt = user.attempts.find(
-            (a) => a.productId === productId
-          );
-          if (attempt) {
-            const lastAttempt = attempt.attempts[attempt.attempts.length - 1];
-            if (lastAttempt?.amount) {
-              finalPrice = lastAttempt.amount;
-              if (finalPrice < basePrice) {
-                totalDiscount +=
-                  (basePrice - finalPrice) * _product.quantity;
-              }
-            }
-          }
-        }
-      }
+      // Calculate discount based on product discount
+      const discountPercent = _product.productId?.discount || 0;
+      const discountAmount = basePrice * (discountPercent / 100);
+      finalPrice = basePrice - discountAmount;
+      totalDiscount += discountAmount * _product.quantity;
 
       _product.price = finalPrice;
       _product.totalAmount = finalPrice * _product.quantity;
       subtotal += _product.totalAmount;
 
-      const gstAmount =
-        (finalPrice *
-          _product.quantity *
-          (_product.productId?.gst || 0)) /
-        100;
+      // Calculate GST
+      const gstAmount = (finalPrice * _product.quantity * (_product.productId?.gst || 0)) / 100;
       totalTax += gstAmount;
     }
 
@@ -214,7 +76,7 @@ export const userCartController = new Elysia({
 
     // Coupon validation and application
     let couponDiscount = 0;
-    let couponErrorMessage: string | null = null;
+    let couponErrorMessage = null;
 
     if (couponCode) {
       const coupon = await CouponModel.findOne({ code: couponCode, active: true, deletedAt: null });
@@ -233,9 +95,12 @@ export const userCartController = new Elysia({
     }
 
     // Update the response cart totals
-    responseCart.tax = roundedTax;
-    responseCart.subtotal = subtotal;
-    responseCart.totalPrice = totalPrice;
+    const responseCart = {
+      ...cart.toObject(),
+      subtotal,
+      tax: roundedTax,
+      totalPrice,
+    };
 
     const availableCoupons = await CouponModel.find({
       active: true,
@@ -253,17 +118,11 @@ export const userCartController = new Elysia({
       const config = await Config.findOne();
       if (!config) throw new Error("Config not found");
 
-      let {
-        freeDeliveryMinDistance = 0,
-        deliveryFreeAfter = 0,
-      } = config;
+      let { freeDeliveryMinDistance = 0, deliveryFreeAfter = 0 } = config;
 
       const address = await Address.findById(addressId);
       if (address) {
-        const {
-          distance: { value: calculatedDistance },
-          duration: { value: calculatedSeconds },
-        } = await calculateRoadDistance(
+        const { distance: { value: calculatedDistance }, duration: { value: calculatedSeconds } } = await calculateRoadDistance(
           Number(storeCords.lat),
           Number(storeCords.long),
           Number(address.latitude),
@@ -275,10 +134,7 @@ export const userCartController = new Elysia({
         responseCart.deliverySeconds = calculatedSeconds;
         responseCart.platformFee = 5;
 
-        let distanceToCharge = Math.max(
-          calculatedDistance / 1000 - freeDeliveryMinDistance,
-          0
-        );
+        let distanceToCharge = Math.max(calculatedDistance / 1000 - freeDeliveryMinDistance, 0);
         let deliveryFee = Math.ceil(distanceToCharge * 10);
 
         if (deliveryFreeAfter > 0 && totalPrice >= deliveryFreeAfter) {
@@ -294,18 +150,14 @@ export const userCartController = new Elysia({
       responseCart.platformFee = 5;
     }
 
-    // We don't save the responseCart to DB - only the original cart is saved
-    await cart.save();
-
     return {
       message: "Cart details retrieved successfully",
       status: true,
       totalDistance: responseCart.totalDistance,
       cart: responseCart,
       summary: {
-        subtotalBeforeDiscount,
-        totalDiscount,
         subtotal,
+        totalDiscount,
         tax: roundedTax,
         totalPrice,
         couponDiscount,
@@ -314,7 +166,6 @@ export const userCartController = new Elysia({
       platformFee: responseCart.platformFee,
       coupons: availableCoupons,
       deliverySeconds: responseCart.deliverySeconds,
-      //@ts-ignore
       deliveryMinutes: Math.ceil(responseCart.deliverySeconds / 60),
       couponError: couponErrorMessage,
     };
@@ -328,13 +179,9 @@ export const userCartController = new Elysia({
     };
   }
 })
-
-
-
 .post(
   "/update",
   async ({ body, set, store }) => {
-      //@ts-ignore
     const { products } = body;
     const userId = (store as StoreType)["id"];
 
@@ -346,7 +193,6 @@ export const userCartController = new Elysia({
       }
 
       let cart = await CartModel.findOne({ user: userId, status: "active" });
-
       if (!cart) {
         cart = await CartModel.create({
           user: userId,
@@ -356,126 +202,71 @@ export const userCartController = new Elysia({
       }
 
       let totalTax = 0;
+      // Start with existing products
       let updatedProducts = [...cart.products];
-      let totalDiscount = 0;
-      let subtotalBeforeDiscount = 0;
 
-      // First pass: Handle all main products
       for (const product of products) {
-        let productDoc = await Product.findById(product.productId).select("price gst");
-        let isCombo = false;
-        
+        const { productId, quantity, options = [] } = product;
+
+        if (quantity < 1) {
+          set.status = 400;
+          return { message: `Invalid quantity for product ${productId}`, status: false };
+        }
+
+        // Try finding product from Product or ComboOffer
+        let productDoc = await Product.findById(productId)
+          .select("price gst discount name description images stock");
         if (!productDoc) {
-          // Check in ComboOffer model if not found in Product
-          productDoc = await ComboOffer.findById(product.productId).select("price gst");
+          productDoc = await ComboOffer.findById(productId)
+            .select("price gst discount name description images");
           if (!productDoc) {
             set.status = 404;
-            return { message: `Product ${product.productId} not found in Product or ComboOffer`, status: false };
+            return { message: `Product ${productId} not found`, status: false };
           }
-          isCombo = true;
         }
 
-        if (product.quantity < 1) {
+        // Check stock for regular products
+        if (productDoc instanceof Product && productDoc.stock < quantity) {
           set.status = 400;
-          return { message: `Invalid quantity for product ${product.productId}`, status: false };
-        }
-
-        // Calculate base price without any offers
-        const basePrice = productDoc.price;
-        subtotalBeforeDiscount += basePrice * product.quantity;
-
-        // Prepare selectedOffer data and calculate final price
-        let selectedOffer = null;
-        let finalPrice = basePrice;
-        let discountAmount = 0;
-
-        if (product.selectedOffer) {
-          const { offerType, onMRP } = product.selectedOffer;
-
-          selectedOffer = {
-            offerType,
-            discount: offerType === 'Discount' ? product.selectedOffer.discount : undefined,
-            onMRP: offerType === 'onMRP' ? {
-              subType: onMRP.subType,
-              reductionValue: onMRP.reductionValue,
-              message: onMRP.subType === 'Need' ? onMRP.message : undefined,
-              productId: onMRP.subType === 'Complementary' ? onMRP.productId : undefined
-            } : undefined,
-            flatAmount: offerType === 'Flat' ? product.selectedOffer.flatAmount : undefined,
-            negotiate: offerType === 'Negotiate' ? {
-              negotiatedPrice: product.selectedOffer.negotiate?.negotiatedPrice,
-              attempts: product.selectedOffer.negotiate?.attempts?.map((attempt: { amount: any; attemptNumber: any; }) => ({
-                amount: attempt.amount,
-                attemptNumber: attempt.attemptNumber
-              }))
-            } : undefined
+          return { 
+            message: `Only ${productDoc.stock} items available for ${productDoc.name}`,
+            status: false 
           };
-
-          // Calculate price based on offer type
-          switch(offerType) {
-            case 'Discount':
-              discountAmount = basePrice * (product.selectedOffer.discount / 100);
-              finalPrice = basePrice - discountAmount;
-              totalDiscount += discountAmount * product.quantity;
-              break;
-              
-            case 'onMRP':
-              // onMRP doesn't affect the price directly
-              finalPrice = basePrice;
-              break;
-              
-            case 'Flat':
-              discountAmount = product.selectedOffer.flatAmount;
-              finalPrice = basePrice - discountAmount;
-              totalDiscount += discountAmount * product.quantity;
-              break;
-              
-            case 'Negotiate':
-              finalPrice = product.selectedOffer.negotiate?.negotiatedPrice || basePrice;
-              if (finalPrice < basePrice) {
-                totalDiscount += (basePrice - finalPrice) * product.quantity;
-              }
-              break;
-          }
-
-          selectedOffer = JSON.parse(JSON.stringify(selectedOffer));
         }
 
-        const productTotal = product.quantity * finalPrice;
+        const basePrice = productDoc.price;
+        const discount = productDoc.discount || 0;
+        const discountedPrice = basePrice - (basePrice * discount / 100);
+        const productTotal = quantity * discountedPrice;
+        const gstAmount = (productTotal * productDoc.gst) / 100;
+        totalTax += gstAmount;
+
+        // Check if product already exists in cart
+        const existingIndex = updatedProducts.findIndex(
+          p => p.productId.toString() === productId.toString()
+        );
 
         const productData = {
           productId: productDoc._id,
-          quantity: product.quantity,
+          quantity,
+          price: discountedPrice,
           totalAmount: productTotal,
-          price: finalPrice,
-          options: product.options || [],
-          ...(selectedOffer && { selectedOffer })
+          options,
+          name: productDoc.name,
+          image: productDoc.images?.[0] || null,
+          discount
         };
 
-        // Find if same product exists (regardless of offer type)
-        const existingProductIndex = updatedProducts.findIndex(p => 
-          p.productId.toString() === productDoc._id.toString()
-        );
-
-        if (existingProductIndex !== -1) {
-          updatedProducts[existingProductIndex] = productData;
+        if (existingIndex !== -1) {
+          // Update existing product
+          updatedProducts[existingIndex] = productData;
         } else {
+          // Add new product
           updatedProducts.push(productData);
         }
-
-        // Add GST based on final price
-        const gstAmount = (finalPrice * product.quantity * productDoc.gst) / 100;
-        totalTax += gstAmount;
       }
 
-      // Final cleanup: Remove any duplicate products
-      const uniqueProducts = new Map();
-      for (const product of updatedProducts) {
-        uniqueProducts.set(product.productId.toString(), product);
-      }
-      updatedProducts = Array.from(uniqueProducts.values());
-
-      const subtotal = updatedProducts.reduce((sum, product) => sum + product.totalAmount, 0);
+      const subtotal = updatedProducts.reduce((sum, p) => sum + p.totalAmount, 0);
       const tax = Number(totalTax.toFixed(2));
       const totalPrice = subtotal + tax;
 
@@ -491,25 +282,25 @@ export const userCartController = new Elysia({
           },
         },
         { new: true }
-      )
-        .populate('products.productId')
-        .populate('products.selectedOffer.onMRP.productId');
-      
+      ).populate({
+        path: "products.productId",
+        select: "name price images",
+        model: "Product"
+      });
+
       return {
         message: "Cart updated successfully",
         status: true,
         cart,
         summary: {
-          subtotalBeforeDiscount,
-          totalDiscount,
           subtotal,
           tax,
-          totalPrice
-        }
+          totalPrice,
+        },
       };
     } catch (error) {
       console.error(error);
-      set.status = error instanceof Error && error.message.includes("not found") ? 404 : 400;
+      set.status = 500;
       return {
         message: "Failed to update cart",
         status: false,
@@ -518,6 +309,7 @@ export const userCartController = new Elysia({
     }
   }
 )
+
 
 .post(
   "/updatequantity",
@@ -564,13 +356,13 @@ export const userCartController = new Elysia({
       const name = isCombo ? productDoc.comboName : productDoc.productName;
 
       // Debug: Log product details
-      console.log("Product Details:", {
-        productId,
-        price,
-        gst,
-        name,
-        isCombo,
-      });
+      // console.log("Product Details:", {
+      //   productId,
+      //   price,
+      //   gst,
+      //   name,
+      //   isCombo,
+      // });
 
       // Validate price and gst
       if (typeof price !== "number" || isNaN(price)) {

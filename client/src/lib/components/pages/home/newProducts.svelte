@@ -10,14 +10,14 @@
   import Icon from '@iconify/svelte';
 
   interface Product {
+    unit: string;
     id: string | number;
     name: string;
     image: string[];
-    discount: number;
     MRP: number;
-    strikePrice: number;
     available: boolean;
     description?: string;
+    discount?: number;
     ratings?: number;
     categoryId?: string;
     categoryName?: string;
@@ -45,21 +45,33 @@
         throw new Error(response.data.message || 'Failed to fetch products');
       }
 
-      const allProducts = response.data.data.map((product: any) => ({
-        id: product._id,
-        name: product.productName,
-        image: product.images,
-        discount: product.discount || 0,
-        MRP: product.price,
-        strikePrice: product.strikePrice || product.price,
-        description: product.description,
-        ratings: product.ratings,
-        categoryId: product.categoryId,
-        categoryName: product.categoryName,
-        favorite: product.favorite,
-        available: product.available,
-      }));
+      console.log('API Response:', response.data.data); // Debug log
 
+      const allProducts = response.data.data.map((product: any) => {
+        console.log('Raw product from API:', product); // Debug full product
+        console.log('Mapping product unit:', product.unit); // Debug log
+        console.log('Unit type:', typeof product.unit);
+        
+        const mappedProduct = {
+          id: product._id,
+          name: product.productName,
+          image: product.images,
+          discount: product.discount || 0,
+          MRP: product.price,
+          unit: product.unit, 
+          description: product.description,
+          ratings: product.ratings,
+          categoryId: product.categoryId,
+          categoryName: product.categoryName,
+          favorite: product.favorite,
+          available: product.available,
+        };
+        
+        console.log('Mapped product unit:', mappedProduct.unit);
+        return mappedProduct;
+      });
+
+      console.log('Mapped products:', allProducts); // Debug log
       return allProducts;
     },
   });
@@ -67,6 +79,15 @@
   $: products = $productsQuery.data ?? [];
   $: productsLoading = $productsQuery.isLoading;
   $: productsError = $productsQuery.error ? ($productsQuery.error as Error).message : null;
+
+  // Debug reactive statement
+  $: {
+    console.log('Products in component:', products);
+    products.forEach((product, index) => {
+      console.log(`Product ${index} unit:`, product.unit);
+      console.log(`Product ${index} full object:`, product);
+    });
+  }
 </script>
 
 <section class="pl-4 md:px-6 lg:px-8 py-10">
@@ -101,13 +122,19 @@
     <div class="flex md:gap-6 items-center  flex-wrap gap-4 py-1 px-1  scrollbar-hide">
       {#each products as product (product.id)}
         <div class="flex-wrap">
+          <!-- Debug: Log what we're passing to ProductCard -->
+          {console.log('Passing to ProductCard:', {
+            id: product.id,
+            unit: product.unit,
+            name: product.name
+          })}
           <ProductCard
             id={product.id}
             image={product.image[0]}
             discount={product.discount}
             name={product.name}
             MRP={product.MRP}
-            strikePrice={product.strikePrice}
+            unit={product?.unit}
             favorite={product.favorite}
             available={product.available}
           />

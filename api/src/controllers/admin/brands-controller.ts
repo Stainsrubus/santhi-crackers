@@ -30,17 +30,18 @@ export const brandsController = new Elysia({
           return { message: "Failed to upload image", status: false };
         }
 
-        const dipping = await Brand.create({
+        const brand = await Brand.create({
           name,
           image: filename,
           active: true,
         });
 
-        await dipping.save();
+        await brand.save();
 
         return {
           message: "Brand Created Successfully",
           status: true,
+          data: brand,
         };
       } catch (error) {
         console.error(error);

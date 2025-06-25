@@ -201,6 +201,12 @@
         <li>
           <a href="/cart" class="lg:text-lg md:text-base text-sm hover:underline">Cart</a>
         </li>
+        <li>
+          <a href="/privacy-policy" class="lg:text-lg md:text-base text-sm hover:underline">Privacy Policy</a>
+        </li>
+        <li>
+          <a href="/terms-and-conditions" class="lg:text-lg md:text-base text-sm hover:underline">Terms & Conditions</a>
+        </li>
       </ul>
     </div>
 
@@ -248,4 +254,13 @@
     </div>
   </div>
 </div>
+
 </footer>
+<div class="border-t bg-custom-gradient py-2 flex-col md:flex-row flex items-center justify-center   !border-gray-100/30">
+  <p class="text-white">
+    <a href="https://www.wenoxo.in/">
+      <span class="text-white">© 2025 Wenoxo Technologies. All rights reserved. </span> 
+    </a>
+    <!-- | <a href="#">Privacy Policy</a> | <a href="#">Terms & Conditions</a> -->
+  </p>
+  </div>

@@ -103,7 +103,7 @@ export const usersAuthController = new Elysia({
     try {
       const response = await axios.post('https://www.xopay.in/api/v2/otp/otp', {
         phone: mobile,
-        company_name: "Jeya Medicals",
+        company_name: "Fire Crackers",
       });
 
       if (response.data.status) {

@@ -81,9 +81,16 @@ import logo from "$lib/assets/logo.png"
 			canManagerAccess: true
 		},
 		{
+			name: 'Group',
+			href: '/dashboard/group/',
+			icon: 'mingcute:ai-line',
+			subRoutes: '-',
+			canManagerAccess: true
+		},
+		{
 			name: 'Products',
 			href: '/dashboard/products/',
-			icon: 'simple-line-icons:chemistry',
+			icon: 'mingcute:classify-add-2-fill',
 			subRoutes: '-',
 			canManagerAccess: true
 		},
@@ -181,7 +188,7 @@ import logo from "$lib/assets/logo.png"
 			<div
 				class="shadow-sm min-h-[50px] cursor-pointer flex gap-2 justify-center items-center"
 			>
-				<img src='/logoW.png'  width="120" class="py-1 " alt="">
+				<img src='/dummyLogo.png'  width="120" class="py-1 " alt="">
 				<!-- <p class="font-bold font-4xl py-5">Jeya Medical Enterprises</p> -->
 			</div>
 		</button>

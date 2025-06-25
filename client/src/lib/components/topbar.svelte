@@ -104,21 +104,30 @@
     queryFn: async () => {
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('No token found');
+        return { status: false, message: "No token found", count: 0 };
       }
 
-      const response = await _axios.get('/cart/count', {
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
+      try {
+        const response = await _axios.get('/cart/count', {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
 
-      if (!response.data.status && response.data.message !== "No active cart found") {
-        throw new Error(response.data.message || 'Failed to fetch cart count');
+        // Handle both success and "no cart" cases
+        if (!response.data.status && response.data.message === "No active cart found") {
+          return { status: true, message: "No active cart", count: 0 };
+        } else if (!response.data.status) {
+          throw new Error(response.data.message || 'Failed to fetch cart count');
+        }
+
+        return response.data;
+      } catch (error:any) {
+        console.error('Cart count error:', error);
+        return { status: false, message: error.message, count: 0 };
       }
-
-      return response.data;
     },
     retry: 1,
     staleTime: 0,
+    refetchOnWindowFocus: true,
     enabled: $writableGlobalStore.isLogedIn,
   });
 
@@ -145,6 +154,7 @@
     enabled: $writableGlobalStore.isLogedIn,
   });
 
+  
   const hasNewNotificationsQuery = createQuery<{ hasNew: boolean }>({
     queryKey: ['hasNewNotifications'],
     queryFn: async () => {
@@ -611,6 +621,8 @@
     account: { icon: 'mdi:account', color: 'bg-purple-100 text-purple-600' },
     other: { icon: 'mdi:bell', color: 'bg-gray-100 text-gray-600' },
   };
+
+  // console.log(cartCount)
 </script>
 
 <div class="flex items-center justify-between h-[70px] z-50 w-screen lg:px-10 md:px-5 px-2 bg-white shadow-md">
@@ -668,7 +680,7 @@
             </span>
           {/if}
         </div>
-        <p class={`${currentPath === '/wishlist' ? 'text-primary' : 'text-black'}`}>Cart</p>
+        <p class={`${currentPath === '/cart' ? 'text-primary' : 'text-black'}`}>Cart</p>
       </div>
       <!-- Notification with Tooltip -->
       {#if $writableGlobalStore.isLogedIn}
@@ -702,7 +714,7 @@
  </div>
   </div>
 
-<div class="w-1/2 flex justify-end">
+<div class="w-1/2 flex gap-3 justify-end">
     <!-- Search Bar (Hidden on Mobile) -->
     <div class="hidden md:block flex-1 mx-4 lg:max-w-96 md:max-w-72">
       <div class="border flex w-full rounded-full bg-white md:p-1 p-1">
@@ -765,6 +777,21 @@
     </div>
   
       <!-- User Profile/Login -->
+      <div onclick={() => goto('/cart')} class="flex md:hidden  items-center gap-2 cursor-pointer">
+        <div class="relative">
+          <img
+            src={currentPath === '/cart' ? '/svg/cart-filled.svg' : '/svg/cart.svg'}
+            alt="Cart"
+          />
+          {#if !$writableGlobalStore.isLogedIn}
+          {:else if cartCount > 0}
+            <span class={`absolute -top-1 -right-1 bg-custom-gradient text-white rounded-full flex items-center justify-center text-xs font-semibold ${currentPath === '/cart' ? 'border border-white min-w-5 min-h-5' : 'border-none min-w-4 min-h-4'}`}>
+              {cartCount}
+            </span>
+          {/if}
+        </div>
+        <!-- <p class={`${currentPath === '/cart' ? 'text-primary' : 'text-black'}`}>Cart</p> -->
+      </div>
       <div class="flex items-center gap-2 cursor-pointer relative">
         {#if $writableGlobalStore.isLogedIn}
           <DropdownMenu.Root bind:open={isDropdownOpen}>

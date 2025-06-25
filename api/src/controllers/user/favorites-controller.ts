@@ -109,6 +109,10 @@ export const favoritesController = new Elysia({
                 path: "category",
                 select: "_id active",
               },
+              {
+path:"unit",
+select:"name",
+              }
             ],
           })
           .skip((_page - 1) * _limit)

@@ -46,7 +46,7 @@
 						class="object-cover"
 					></Avatar.Image> -->
 					
-					<Avatar.Fallback class="text-white bg-custom-gradient">JME</Avatar.Fallback>
+					<Avatar.Fallback class="text-white bg-custom-gradient">A</Avatar.Fallback>
 				</Avatar.Root>
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content>

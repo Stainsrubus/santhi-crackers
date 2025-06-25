@@ -9,7 +9,7 @@
 
 	import ProductCard from '$lib/components/productCard.svelte';
 
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
+	// import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 
 	import Footer from '$lib/components/footer.svelte';
 
@@ -336,7 +336,8 @@
 
 				favorite: product.favorite,
 
-				available: product.available
+				available: product.available,
+				unit: product.unit
 			}));
 
 			return {
@@ -388,14 +389,16 @@
 
 <div class="relative flex h-auto px-4 pb-4 pt-10 md:px-6 md:pb-6 lg:px-4 lg:pb-8">
 	<!-- Main Content -->
-
-	<main class="flex flex-col items-start gap-10 p-0 py-0 lg:flex-row lg:px-3">
+	
+	<main class="flex flex-col items-start gap-5 p-0 py-0 lg:flex-row lg:px-3">
 		<!-- Filter Button and Active Filters -->
-
-		<div class="lg:mb-4 flex items-center justify-between">
+		<p class="lg:hidden block text-3xl  font-bold">
+			Products
+		</p>
+		<div class="flex items-center justify-between lg:mb-4">
 			<div class="">
 				<aside
-					class=" h-full w-80 hidden lg:block transform bg-white shadow-xl transition-transform duration-300 ease-in-out"
+					class=" hidden h-full w-80 transform bg-white shadow-xl transition-transform duration-300 ease-in-out lg:block"
 				>
 					<div class="h-full overflow-y-auto p-6">
 						<!-- Close Button -->
@@ -510,7 +513,7 @@
 
 			<button
 				on:click={toggleMobileSidebar}
-				class="flex items-center rounded-full bg-custom-gradient px-6 py-2 text-base text-white lg:hidden"
+				class="bg-custom-gradient flex items-center rounded-full px-6 py-2 text-base text-white lg:hidden"
 			>
 				<Icon icon="mdi:filter" class="mr-2 h-5 w-5" />
 
@@ -782,7 +785,7 @@
 								discount={product.discount}
 								name={product.name}
 								MRP={product.MRP}
-								strikePrice={product.strikePrice}
+								unit={product.unit}
 								favorite={product.favorite}
 								available={product.available}
 							/>

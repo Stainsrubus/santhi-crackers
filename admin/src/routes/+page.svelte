@@ -63,9 +63,9 @@
 
 <div class="flex h-screen">
 	<!-- Image Container -->
-	<div class="hidden md:flex w-1/2 bg-cover bg-left" style={`background-image: url(${bg});`}>
-		<div class="flex justify-center items-center h-full w-full">
-			<img src="/logo.png" alt="Logo" />
+	<div class="hidden md:flex w-1/2 bg-cover  justify-center items-center" style={`background-image: url(${bg});`}>
+		<div class="flex justify-center items-center">
+			<img src="/dummyLogo.png" alt="Logo" class="h-auto w-1/2" />
 		</div>
 	</div>
 

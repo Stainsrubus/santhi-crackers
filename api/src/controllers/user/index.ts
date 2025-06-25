@@ -38,6 +38,9 @@ const userBaseController = new Elysia({
   .use(quoteController)
   .use(userOfferController)
   .use(StoreController)
+  .use(termsandconditionsController)
+  .use(privacyPolicyController)
+
   .state("id", "")
   .state("mobile", "")
   .state("role", "")
@@ -67,13 +70,11 @@ const userBaseController = new Elysia({
   .use(newuserCartController) // new user
   .use(userCartController)
   .use(newuserOrderController) // new user
-  .use(privacyPolicyController)
   .use(invoiceController)
   .use(foodReviewController)
   .use(deliveryAgentReviewController)
   .use(notificationController)
   .use(couponController)
-  .use(termsandconditionsController)
 .use(demandController)
 
 export { userBaseController };

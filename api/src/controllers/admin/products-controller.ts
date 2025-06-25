@@ -7,6 +7,8 @@ import { Product } from "../../models/product";
 import { ProductCategory } from "../../models/product-category";
 import { Brand } from "@/models/brand-model";
 import { deleteFile, saveFile } from "@/lib/file";
+import { UnitModel } from "@/models/unit-model";
+import { Group } from "@/models/group";
 
 export const productsController = new Elysia({
   prefix: "/product",
@@ -25,19 +27,24 @@ export const productsController = new Elysia({
         brand,
         price,
         stock,
+        unit,
+        discount,
         // strikePrice,
-        HSNCode,
+        // HSNCode,
         active,
         images,
         productCode,
         ratings,
         topSeller,
         gst,
-        options, 
+        groups, 
+        // options, 
         // negotiateLimit,
         specifications,
       } = body;
 
+      const _unit = await UnitModel.findById(unit);
+      if (!_unit) return { message: "Unit not found", status: false };
       const _category = await ProductCategory.findById(category);
       if (!_category) return { message: "Category not found", status: false };
 
@@ -57,17 +64,19 @@ export const productsController = new Elysia({
         if (ok) _images.push(filename);
       }
 
-      let _options = JSON.parse(options);
+      // let _options = JSON.parse(options);
       let _specifications = JSON.parse(specifications); 
       const product = await Product.create({
         productName,
         description,
         price: +price,
         stock:+stock,
+        unit: _unit._id,
+        discount: +discount,
         // negotiateLimit:+negotiateLimit,
         images: _images,
         active,
-        HSNCode:HSNCode,
+        // HSNCode:HSNCode,
         // strikePrice:+strikePrice,
         category: _category._id,
         brand:_brand._id,
@@ -75,12 +84,18 @@ export const productsController = new Elysia({
         ratings: +ratings,
         topSeller: topSeller === "true",
         gst: +gst,
-        options: _options, 
+             groups: groups || [], 
+        // options: _options, 
         specifications: _specifications,
       });
 
       await product.save();
-
+      if (groups && groups.length > 0) {
+        await Group.updateMany(
+          { _id: { $in: groups } },
+          { $addToSet: { products: product._id } }
+        );
+      }
       return {
         message: "Product Created Successfully",
         data: { name: product.productName },
@@ -95,12 +110,14 @@ export const productsController = new Elysia({
     body: t.Object({
       productName: t.String({ default: "Product", examples: ["baby pants"] }),
       category: t.String({}),
+      unit: t.String({}),
       brand:t.String({}),
       ratings: t.Number({ default: 5, examples: [5] }),
       images: t.Files(),
       productCode: t.String({ default: "123456", examples: ["123456"] }),
       price: t.String({ default: 100 }),
-      HSNCode:t.String(),
+      discount: t.String({ default: 10 }),
+      // HSNCode:t.String(),
       // negotiateLimit:t.String({default:0}),
       // strikePrice: t.String({ default: 150 }),
       description: t.String({ default: "Product" }),
@@ -108,8 +125,9 @@ export const productsController = new Elysia({
       stock:t.String({default:0}),
       gst: t.String({ default: 0 }),
       active: t.Boolean({ default: true }),
-      options: t.String({ examples: ['[{"title":"Size","values":["S","M","L"]}]'] }),
+      // options: t.String({ examples: ['[{"title":"Size","values":["S","M","L"]}]'] }),
       specifications: t.String(),
+      groups: t.Array(t.String()), 
     }),
     detail: { summary: "Create a new product" },
   }
@@ -314,6 +332,10 @@ export const productsController = new Elysia({
           .populate({
             path: "category",
             select: "name categoryNumber",
+          })
+          .populate({
+            path: "unit",
+            select: "name",
           })
           .populate({
             path: "brand",
@@ -596,6 +618,7 @@ export const productsController = new Elysia({
           description,
           category,
           price,
+          discount,
           // negotiateLimit,
           stock,
           // strikePrice,
@@ -607,6 +630,7 @@ export const productsController = new Elysia({
           brand,
           topSeller,
           gst,
+          groups, 
           specifications,
         } = body;
   
@@ -678,7 +702,7 @@ export const productsController = new Elysia({
             // console.log("existingImages is empty. Deleting all images from DB.");
             if (_images.length > 0) {
               for (const oldImage of _images) {
-                const { ok } = await deleteFile(oldImage);
+                const { ok } = await deleteFile(oldImage,"product");
                 if (!ok) {
                   console.warn(`Failed to delete old image: ${oldImage}`);
                 } else {
@@ -696,7 +720,7 @@ export const productsController = new Elysia({
   
             if (imagesToRemove.length > 0) {
               for (const oldImage of imagesToRemove) {
-                const { ok } = await deleteFile(oldImage);
+                const { ok } = await deleteFile(oldImage,'product');
                 if (!ok) {
                   console.warn(`Failed to delete old image: ${oldImage}`);
                 } else {
@@ -772,6 +796,7 @@ export const productsController = new Elysia({
             productName: productName || product.productName,
             description: description || product.description,
             price: price ? +price : product.price,
+            discount: discount ? +discount : product.discount,
             stock:stock?+stock:product.stock,
             // negotiateLimit:negotiateLimit?+negotiateLimit:product.negotiateLimit,
             // strikePrice: strikePrice ? +strikePrice : product.strikePrice,
@@ -787,12 +812,18 @@ export const productsController = new Elysia({
                 ? topSeller === "true"
                 : product.topSeller,
             gst: gst ? +gst : product.gst,
+            groups: groups || product.groups,
             // options: options ? JSON.parse(options) : product.options,
             specifications: specifications ? JSON.parse(specifications) : product.specifications,
           },
           { new: true }
         );
-  
+        if (groups && groups.length > 0) {
+          await Group.updateMany(
+            { _id: { $in: groups } },
+            { $addToSet: { products: product._id } }
+          );
+        }
         return {
           message: "Product updated successfully",
           status: true,
@@ -814,6 +845,7 @@ export const productsController = new Elysia({
         category: t.Optional(t.String()),
         brand: t.Optional(t.String()),
         price: t.Optional(t.String()),
+        discount: t.Optional(t.String()),
         stock:t.Optional(t.String()),
         // negotiateLimit:t.Optional(t.String()),
         // strikePrice: t.Optional(t.String()),
@@ -825,6 +857,7 @@ export const productsController = new Elysia({
         ratings: t.Optional(t.String()),
         topSeller: t.Optional(t.String()),
         gst: t.Optional(t.String()),
+        groups: t.Optional(t.Array(t.String())),
         // options: t.Optional(t.String()),
         specifications: t.Optional(t.String()),
       }),

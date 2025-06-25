@@ -459,7 +459,7 @@
 <div class="max-w-2xl md:mx-auto mx-4  p-4 border my-20 rounded-lg shadow scrollbar-hide">
   <div class="flex justify-between items-center mb-4">
     <h2 class="text-3xl text-[#30363C] font-semibold">Address Management</h2>
-    <Button onclick={openDialog} class="bg-[#01A0E2] hover:bg-[#01A0E2] text-white px-4 py-2 rounded-md hover:scale-105 transition-all duration-300">
+    <Button onclick={openDialog} class="bg-custom-gradient  text-white px-4 py-2 rounded-md hover:scale-105 transition-all duration-300">
       Add Address
     </Button>
   </div>
@@ -497,7 +497,7 @@
             </div>
             <div class="flex flex-col items-end gap-2">
           
-              <Icon icon="cuida:edit-outline" class="w-6 h-7 text-[#4F585E] cursor-pointer hover:text-[#01A0E2]" onclick={() => {selectedAddress = address; openDialog(address);}} />
+              <Icon icon="cuida:edit-outline" class="w-6 h-7 text-[#4F585E] cursor-pointer hover:scale-105 transition-all" onclick={() => {selectedAddress = address; openDialog(address);}} />
               <Icon icon="cuida:trash-outline" class="w-7 h-7 text-[#4F585E] cursor-pointer hover:text-red-500" onclick={() => openDeleteConfirm(address)} />
             </div>
           </div>
@@ -524,7 +524,7 @@
           <p
             onclick={() => (newAddress.addressType = option)}
             class="w-full p-2 border rounded-md cursor-pointer text-center transition-colors duration-200
-                   {newAddress.addressType === option ? 'border-[#01A0E2] text-[#01A0E2] bg-[#ACDEF247]' : 'border-[#A6AEB4] text-[#A6AEB4] hover:bg-gray-100'}"
+                   {newAddress.addressType === option ? 'border-primary text-primary bg-primary/10' : 'border-[#A6AEB4]  text-[#A6AEB4] hover:bg-gray-100'}"
           >
             {option}
           </p>
@@ -593,7 +593,7 @@
 {:else}
 <div class="container max-w-2xl my-20 py-20 rounded-lg shadow-lg flex-col gap-3 flex justify-center items-center">
 <p class="text-lg font-medium">Please login to Add Address</p>
-<button onclick={()=>{goto('/login')}} class="bg-[#01A0E2] hover:bg-[#01A0E2] rounded-lg px-4 text-lg text-white py-2">Login</button>
+<button onclick={()=>{goto('/login')}} class="bg-custom-gradient hover:scale-105 transition-all rounded-lg px-4 text-lg text-white py-2">Login</button>
 </div>
 
 {/if}

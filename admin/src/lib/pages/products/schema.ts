@@ -12,7 +12,10 @@ export const specificationSchema = z.object({
   name: z.string({ message: 'Specification name is required' }),
   fields: z.record(z.string(), z.string()),
 });
-
+export const groupSchema = z.object({
+  _id: z.string(),
+  name: z.string(),
+});
 // Define the main product schema
 export const _productsSchema = z.object({
   productName: z
@@ -21,8 +24,12 @@ export const _productsSchema = z.object({
   category: z
     .string({ message: 'Category is required' })
     .min(1),
+    group: z.array(z.string()).min(1, { message: 'At least one group is required' }),
   brand: z
     .string({ message: 'Brand is required' })
+    .min(1),
+    unit: z
+    .string({ message: 'Unit is required' })
     .min(1),
   price: z
     .string()
@@ -35,12 +42,15 @@ export const _productsSchema = z.object({
     .refine((val) => /^[0-9]+$/.test(val), {
       message: 'Stock must contain only digits',
     }),
+    discount: z.string().refine((val) => /^[0-9]+$/.test(val), {
+        message: 'Discount must be a numeric string'
+      }),
   // negotiationLimit: z.string({ message: 'Limit must be a numeric string' }),
   // strikePrice: z.string().refine((val) => /^[0-9]+$/.test(val), {
   //   message: 'strikePrice must be a numeric string'
   // }),
-  HSNCode: z
-    .string({ message: 'HSN Code is required' }),
+  // HSNCode: z
+  //   .string({ message: 'HSN Code is required' }),
   productCode: z
     .string(),
   description: z
@@ -55,9 +65,9 @@ export const _productsSchema = z.object({
     }),
   active: z
     .boolean(),
-  options: z
-    .array(optionSchema)
-    .optional(),
+  // options: z
+  //   .array(optionSchema)
+  //   .optional(),
   specifications: z
     .array(specificationSchema)
     .optional(),
@@ -68,11 +78,13 @@ export const productEditStore = writable({
   mode: 'list',
   id: '',
   category: {} as TCategory,
+  group: [] as array[],
   description: '',
   productName: '',
   brand: {} as TBrand,
+  unit: {} as TUnit,
   price: '',
-  // negotiationLimit: '',
+  discount: '',
   // strikePrice: '',
   HSNCode: '',
   productCode: '',
@@ -97,6 +109,14 @@ export type TCategory = {
 };
 
 export type TBrand = {
+  _id: string;
+  name: string;
+};
+export type TGroup = {
+  _id: string;
+  name: string;
+};
+export type TUnit = {
   _id: string;
   name: string;
 };

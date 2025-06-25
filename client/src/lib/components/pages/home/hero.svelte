@@ -137,13 +137,13 @@ return response.data;
         {#if searchResults}
           <button
             on:click={clearSearch}
-            class="ml-1 bg-[#01A0E2] font-medium md:text-xl text-base text-white md:px-5 md:py-5 px-2.5 py-2.5 rounded-full hover:bg-[#156aa3] transition-colors duration-200 flex items-center justify-center"
+            class="ml-1 bg-custom-gradient font-medium md:text-xl text-base text-white md:px-5 md:py-5 px-2.5 py-2.5 rounded-full hover:scale-105 transition-all duration-200 flex items-center justify-center"
           >
             <Icon icon="lucide:x" class="inline-block" width="20" />
           </button>
         {:else}
           <button
-            class="lg:ml-4 ml-1 bg-[#01A0E2] font-medium md:text-xl text-base text-white md:px-9 md:py-4 px-5 py-2 rounded-full hover:bg-[#156aa3] transition-colors duration-200"
+            class="lg:ml-4 ml-1 bg-custom-gradient font-medium md:text-xl text-base text-white md:px-9 md:py-4 px-5 py-2 rounded-full hover:scale-105 transition-all duration-200"
           >
             Search
           </button>

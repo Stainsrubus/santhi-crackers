@@ -38,6 +38,7 @@
     categoryId?: string;
     categoryName?: string;
     favorite: boolean;
+    unit:string;
   }
 
   interface CategoryResponse {
@@ -54,7 +55,7 @@
   }
 
   // Corrected typo: isLoggedIn instead of isLogedIn
-  $: isLoggedIn = $writableGlobalStore.isLoggedIn;
+  $: isLoggedIn = $writableGlobalStore.isLogedIn;
 
   let searchTerm = '';
   let selectedCategoryIds: string[] = [];
@@ -70,7 +71,7 @@
   onMount(() => {
     // Initialize isLoggedIn based on token
     const token = localStorage.getItem('token');
-    if (token && !$writableGlobalStore.isLoggedIn) {
+    if (token && !$writableGlobalStore.isLogedIn) {
       writableGlobalStore.update((store) => ({ ...store, isLoggedIn: true }));
     }
     console.log("Wishlist mounted, isLoggedIn:", isLoggedIn, "token:", token);
@@ -247,6 +248,7 @@
           brandName: product.brand?.name,
           categoryId: product.category?._id,
           categoryName: product.category?.name,
+          unit:product.unit,
           favorite: true
         }))
       );
@@ -406,8 +408,11 @@
 
   <!-- Main Content -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <main class="flex-1 lg:px-3 py-0 p-0">
+  <main class="flex-1 lg:px-3  py-0 p-0">
     <!-- Filter Button and Active Filters -->
+    <p class="lg:hidden block text-3xl py-5 font-bold">
+			Wishlist
+		</p>
     <div class="flex items-center justify-between mb-4">
       <button
         on:click|stopPropagation={toggleDesktopFilter}
@@ -419,7 +424,7 @@
       <!-- Mobile Filter Button -->
       <button
         on:click|stopPropagation={toggleMobileSidebar}
-        class="bg-[#008ECC] text-white text-base px-6 py-2 rounded-full flex items-center lg:hidden"
+        class="bg-custom-gradient text-white text-base px-6 py-2 rounded-full flex items-center lg:hidden"
       >
         <Icon icon="mdi:filter" class="w-5 h-5 mr-2" />
         Filters
@@ -628,14 +633,14 @@
       {:else}
         <div>
           <div class="card md:flex md:flex-wrap grid grid-cols-2 justify-center md:justify-normal lg:gap-10 gap-3">
-            {#each products as product (product.id)}
+            {#each (products as any[]) as product (product.id)}
               <ProductCard
                 id={product.id}
                 image={product.image}
                 discount={product.discount}
                 name={product.name}
                 MRP={product.MRP}
-                strikePrice={product.strikePrice}
+                unit={product.unit?.name}
                 favorite={product.favorite}
                 available={product.stock === 0 ? false : true}
               />

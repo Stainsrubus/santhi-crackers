@@ -13,138 +13,171 @@ export const productController = new Elysia({
     tags: ["User - Product"],
   },
 })
-.get(
-  "/",
-  async ({ query }) => {
-    const { page, limit, q, rating, userId, category, brand, minPrice, maxPrice } = query;
+.get("/", async ({ query }) => {
+  const { page, limit, q, rating, userId, category, brand, minPrice, maxPrice } = query;
 
-    const _limit = parseInt(limit as any) || 10;
-    const _page = parseInt(page as any) || 1;
+  const _limit = parseInt(limit as any) || 10;
+  const _page = parseInt(page as any) || 1;
 
-    let matchFilter: any = { active: true, isDeleted: false };
+  let matchFilter: any = { active: true, isDeleted: false };
 
-    if (q) {
-      matchFilter.$or = [{ productName: { $regex: q, $options: "i" } }];
+  if (q) {
+    matchFilter.$or = [{ productName: { $regex: q, $options: "i" } }];
+  }
+
+  if (rating) {
+    const ratingNumber = parseInt(rating, 10);
+    if (ratingNumber >= 1 && ratingNumber <= 5) {
+      matchFilter.ratings = ratingNumber;
     }
+  }
 
-    if (rating) {
-      const ratingNumber = parseInt(rating, 10);
-      if (ratingNumber >= 1 && ratingNumber <= 5) {
-        matchFilter.ratings = ratingNumber;
+  if (minPrice || maxPrice) {
+    matchFilter.price = {};
+    if (minPrice) matchFilter.price.$gte = parseFloat(minPrice);
+    if (maxPrice) matchFilter.price.$lte = parseFloat(maxPrice);
+  }
+
+  // Apply category filter if category is provided
+  if (category) {
+    const categoryIds = category.split(',').map((id: string) => {
+      try {
+        return new Types.ObjectId(id.trim());
+      } catch (e) {
+        console.error(`Invalid category ID: ${id}`);
+        return null;
       }
+    }).filter(Boolean); // Filter out any invalid IDs
+
+    if (categoryIds.length > 0) {
+      matchFilter.category = { $in: categoryIds };
     }
+  }
 
-    if (minPrice || maxPrice) {
-      matchFilter.price = {};
-      if (minPrice) matchFilter.price.$gte = parseFloat(minPrice);
-      if (maxPrice) matchFilter.price.$lte = parseFloat(maxPrice);
+  // Apply brand filter if brand is provided
+  if (brand) {
+    const brandIds = brand.split(',').map((id: string) => {
+      try {
+        return new Types.ObjectId(id.trim());
+      } catch (e) {
+        console.error(`Invalid brand ID: ${id}`);
+        return null;
+      }
+    }).filter(Boolean); // Filter out any invalid IDs
+
+    if (brandIds.length > 0) {
+      matchFilter.brand = { $in: brandIds };
     }
+  }
 
-    try {
-      const categoryIds = category
-        ? category.split(',').map((id: string) => new Types.ObjectId(id.trim()))
-        : [];
-
-      const brandIds = brand
-        ? brand.split(',').map((id: string) => new Types.ObjectId(id.trim()))
-        : [];
-
-      const aggregationPipeline: any[] = [
-        { $match: matchFilter },
-        {
-          $lookup: {
-            from: "productcategories",
-            localField: "category",
-            foreignField: "_id",
-            as: "categoryDetails",
-          },
+  try {
+    const aggregationPipeline: any[] = [
+      { $match: matchFilter },
+      {
+        $lookup: {
+          from: "productcategories",
+          localField: "category",
+          foreignField: "_id",
+          as: "categoryDetails",
         },
-        { $unwind: "$categoryDetails" },
-        {
-          $lookup: {
-            from: "brands",
-            localField: "brand",
-            foreignField: "_id",
-            as: "brandDetails",
-          },
+      },
+      { $unwind: "$categoryDetails" },
+      {
+        $lookup: {
+          from: "brands",
+          localField: "brand",
+          foreignField: "_id",
+          as: "brandDetails",
         },
-        { $unwind: "$brandDetails" },
-        {
-          $addFields: {
-            available: {
-              $cond: [{ $gt: ["$stock", 0] }, true, false]
-            }
-          },
+      },
+      { $unwind: "$brandDetails" },
+      {
+        $lookup: {
+          from: "units",
+          localField: "unit",
+          foreignField: "_id",
+          as: "unitDetails",
         },
-        {
-          $project: {
-            _id: 1,
-            productName: 1,
-            price: 1,
-            ratings: 1,
-            strikePrice: 1,
-            images: 1,
-            discount: 1,
-            onMRP: 1,
-            description: 1,
-            categoryId: "$categoryDetails._id",
-            categoryName: "$categoryDetails.name",
-            brandId: "$brandDetails._id",
-            brandName: "$brandDetails.name",
-            available: 1
+      },
+      { $unwind: "$unitDetails" },
+      {
+        $addFields: {
+          available: {
+            $cond: [{ $gt: ["$stock", 0] }, true, false]
           }
         }
-      ];
-
-      const allProducts = await Product.aggregate(aggregationPipeline);
-
-      let userFavorites: string[] = [];
-
-      if (userId) {
-        const favorites = await Favorites.findOne({ user: userId });
-        userFavorites = favorites?.products?.map((p: any) => p.toString()) || [];
+      },
+      {
+        $project: {
+          _id: 1,
+          productName: 1,
+          price: 1,
+          ratings: 1,
+          strikePrice: 1,
+          images: 1,
+          discount: 1,
+          onMRP: 1,
+          unit: 1,
+          description: 1,
+          unit: "$unitDetails.name",
+          categoryId: "$categoryDetails._id",
+          categoryName: "$categoryDetails.name",
+          brandId: "$brandDetails._id",
+          brandName: "$brandDetails.name",
+          available: 1
+        }
       }
+    ];
 
-      const total = allProducts.length;
-      const paginatedProducts = allProducts.slice((_page - 1) * _limit, _page * _limit).map(product => ({
-        ...product,
-        favorite: userFavorites.includes(product._id.toString()),
-      }));
+    const allProducts = await Product.aggregate(aggregationPipeline);
 
-      return {
-        data: paginatedProducts,
-        total,
-        page: _page,
-        limit: _limit,
-        status: true,
-      };
-    } catch (error) {
-      console.error(error);
-      return {
-        error,
-        status: false,
-        message: "Something went wrong",
-      };
+    let userFavorites: string[] = [];
+
+    if (userId) {
+      const favorites = await Favorites.findOne({ user: userId });
+      userFavorites = favorites?.products?.map((p: any) => p.toString()) || [];
     }
-  },
-  {
-    detail: {
-      summary: "Get all active products with filters",
-      description: "Supports filtering by multiple categories, brands, price ranges, and ratings. Categories and brands can be comma-separated for multiple values."
-    },
-    query: t.Object({
-      page: t.Optional(t.Number({ default: 1 })),
-      limit: t.Optional(t.Number({ default: 10 })),
-      q: t.Optional(t.String({ default: "" })),
-      rating: t.Optional(t.String()),
-      userId: t.Optional(t.String()),
-      category: t.Optional(t.String({ description: "Comma-separated category IDs" })),
-      brand: t.Optional(t.String({ description: "Comma-separated brand IDs" })),
-      minPrice: t.Optional(t.String()),
-      maxPrice: t.Optional(t.String()),
-    }),
+
+    const total = allProducts.length;
+    const paginatedProducts = allProducts.slice((_page - 1) * _limit, _page * _limit).map(product => ({
+      ...product,
+      favorite: userFavorites.includes(product._id.toString()),
+    }));
+
+    return {
+      data: paginatedProducts,
+      total,
+      page: _page,
+      limit: _limit,
+      status: true,
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      error,
+      status: false,
+      message: "Something went wrong",
+    };
   }
-)
+},
+{
+  detail: {
+    summary: "Get all active products with filters",
+    description: "Supports filtering by multiple categories, brands, price ranges, and ratings. Categories and brands can be comma-separated for multiple values."
+  },
+  query: t.Object({
+    page: t.Optional(t.Number({ default: 1 })),
+    limit: t.Optional(t.Number({ default: 10 })),
+    q: t.Optional(t.String({ default: "" })),
+    rating: t.Optional(t.String()),
+    userId: t.Optional(t.String()),
+    category: t.Optional(t.String({ description: "Comma-separated category IDs" })),
+    brand: t.Optional(t.String({ description: "Comma-separated brand IDs" })),
+    minPrice: t.Optional(t.String()),
+    maxPrice: t.Optional(t.String()),
+  }),
+})
+
 
 
 
@@ -295,6 +328,9 @@ export const productController = new Elysia({
           .populate({
             path: "brand",
             select: "name",
+          }).populate({
+            path:"unit",
+            select:"name"
           })
           .exec();
   
@@ -304,28 +340,13 @@ export const productController = new Elysia({
             status: false,
           };
         }
+
+
   
-        // Check if the product is active in different offer types
-        const [flatOffers, negotiateOffers, discountOffers, mrpOffers] = await Promise.all([
-          FlatOffer.find({ "items.productId": id }).lean(),
-          NegotiateOffer.find({ "items.productId": id }).lean(),
-          DiscountOffer.find({ "items.productId": id }).lean(),
-          MRPOffer.find({ "items.productId": id }).lean(),
-        ]);
-  
-        // Helper function to check if product is active in any of the offers
-        const isProductActiveInOffers = (offers: any[]) => {
-          return offers.some(offer => 
-            offer.items.some((item: any) => 
-              item.productId.toString() === id && item.active !== false
-            )
-          );
-        };
-  
-        const isActiveInFlat = isProductActiveInOffers(flatOffers);
-        const isActiveInNegotiate = isProductActiveInOffers(negotiateOffers);
-        const isActiveInDiscount = isProductActiveInOffers(discountOffers);
-        const isActiveInMRP = isProductActiveInOffers(mrpOffers);
+        // const isActiveInFlat = isProductActiveInOffers(flatOffers);
+        // const isActiveInNegotiate = isProductActiveInOffers(negotiateOffers);
+        // const isActiveInDiscount = isProductActiveInOffers(discountOffers);
+        // const isActiveInMRP = isProductActiveInOffers(mrpOffers);
   
         // Get user favorites
         let userFavorites: String[] = [];
@@ -338,12 +359,6 @@ export const productController = new Elysia({
         const newProduct = {
           ...product._doc,
           favorite: userFavorites.includes(product._id.toString()),
-          // Modify offer fields based on active status in respective offers
-          flat: isActiveInFlat ? product._doc.flat : 0,
-          negotiate: isActiveInNegotiate ? product._doc.negotiate : false,
-          discount: isActiveInDiscount ? product._doc.discount : 0,
-          onMRP: isActiveInMRP ? product._doc.onMRP : 0,
-          negotiateLimit: isActiveInNegotiate ? product._doc.negotiateLimit : 0,
         };
   
         return {

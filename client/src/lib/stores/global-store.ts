@@ -9,6 +9,7 @@ type userDetails = {
 export type GlobalStore = {
     userDetails: userDetails;
     isLogedIn: boolean;
+    cartCount: number;
 };
 
 // Initialize from localStorage if available
@@ -21,18 +22,20 @@ const getInitialState = (): GlobalStore => {
             userDetails: userData ? JSON.parse(userData) : {
                 profileImage: '',
                 userName: '',
-                mobile:''
+                mobile:'',
             },
-            isLogedIn: !!token
+            isLogedIn: !!token,
+            cartCount: 0
         };
     }
     return {
         userDetails: {
             profileImage: '',
             userName: '',
-            mobile:''
+            mobile:'',
         },
-        isLogedIn: false
+        isLogedIn: false,
+        cartCount: 0
     };
 };
 

@@ -13,7 +13,6 @@
 	import { tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import type { productCreateProps } from './schema';
-	import { Label } from '$lib/components/ui/label';
 	import { TimePicker } from 'svelte-time-picker';
 	import { goto } from '$app/navigation';
 
@@ -255,10 +254,11 @@
 					<Table.Head class="w-[100px]">Sl.No</Table.Head>
 					<Table.Head>Product Name</Table.Head>
 					<Table.Head>Product Code</Table.Head>
+					<Table.Head>Unit</Table.Head>
 					<Table.Head>Category</Table.Head>
 					<Table.Head>Price</Table.Head>
+					<Table.Head>Discount</Table.Head>
 					<Table.Head>Stock</Table.Head>
-					<Table.Head>HSN Code</Table.Head>
 					<Table.Head>Active</Table.Head>
 					<!-- <Table.Head>Top Seller</Table.Head> -->
 					<Table.Head>Actions</Table.Head>
@@ -270,10 +270,12 @@
 						<Table.Cell>{i + 1 + (page - 1) * limit}</Table.Cell>
 						<Table.Cell>{product.productName}</Table.Cell>
 						<Table.Cell>{product.productCode}</Table.Cell>
+						<!-- <Table.Cell>{product.unit.name}</Table.Cell> -->
+						<Table.Cell>{product.unit?.name}</Table.Cell>
 						<Table.Cell>{product.category?.name}</Table.Cell>
 						<Table.Cell>₹ {product.price}</Table.Cell>
+						<Table.Cell>{product?.discount} %</Table.Cell>
 						<Table.Cell>{product.stock}</Table.Cell>
-						<Table.Cell>{product.HSNCode}</Table.Cell>
 						<Table.Cell>
 							<Switch
 							class="text-right"
@@ -325,7 +327,8 @@
 				productName: product.productName,
 				stock:product.stock,
 				price: product.price.toString(),
-				HSNCode:product.HSNCode,
+				unit:product.unit,
+discount:product?.discount.toString(),
 				// negotiationLimit:product.negotiateLimit.toString(),
 				// strikePrice: product.strikePrice.toString(),
 				// rating: product.ratings.toString(),

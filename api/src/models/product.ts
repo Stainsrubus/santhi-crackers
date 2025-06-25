@@ -8,7 +8,7 @@ interface ProductInterface {
   productName: string;
   category: Types.ObjectId;
   price: number;
-  strikePrice: number;
+  // strikePrice: number;
   ratings: number;
   productCode: string;
   description: string;
@@ -23,6 +23,7 @@ interface ProductInterface {
   isDeleted: boolean;
   reEnabledAt: Date | null;
   specifications?: Specification[];
+  groups: Types.ObjectId[]; 
 }
 
 
@@ -56,10 +57,10 @@ const ProductSchema = new Schema<ProductInterface>(
       type:Number,
       required:true,
     },
-        strikePrice: {
-      type: Number,
-      // required: true,
-    },
+    //     strikePrice: {
+    //   type: Number,
+    //   required: true,
+    // },
     ratings: {
       type: Number,
       // required: true,
@@ -99,6 +100,12 @@ const ProductSchema = new Schema<ProductInterface>(
       type: Date,
       default: null,
     },
+    groups: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Group",
+      },
+    ],
     discount: { type: Number, default: 0 },
     specifications: [
       {

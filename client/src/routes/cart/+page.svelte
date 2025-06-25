@@ -550,6 +550,7 @@ validateStock();
   }
 </script>
 
+<!-- The rest of the Svelte component (HTML and styles) remains unchanged -->
 <!-- <section class="bg-[#F2F4F5] py-1 px-4 md:px-6 lg:px-8 mb-10">
   <Breadcrumb.Root>
     <Breadcrumb.List>
@@ -564,7 +565,7 @@ validateStock();
   </Breadcrumb.Root>
 </section> -->
 
-<div class="fixed bottom-4 top-4 right-4  z-50 max-w-md w-full space-y-2">
+<div class="fixed bottom-4  right-4 z-50 max-w-md w-full space-y-2">
   {#each notifications as notification (notification._id)}
     <div class="bg-white shadow-lg rounded-lg p-4 border border-gray-200 transition-all duration-300">
       <div class="flex justify-between items-start">
@@ -692,12 +693,24 @@ validateStock();
                   {item.productId.productName}
                 </p>
                 <p>
+                  {#if item.productId?.discount}
                   <span
-                    class={`${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#249B3E]'}`}
-                  >
-                    ₹{item.price}
-                  </span>
-                  {#if item?.selectedOffer}
+                  class={`${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#249B3E]'} line-through`}
+                >
+                  ₹{item.productId.price}
+                </span>
+                <span class='ml-2'>
+                  ₹{item.price}
+                </span>
+                  {:else}
+                  <span
+                  class={`${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#249B3E]'}`}
+                >
+                  ₹{item.productId.price}
+                </span>
+                  {/if}
+                
+                  <!-- {#if item?.selectedOffer}
                     {#if item?.selectedOffer?.offerType === 'Discount'}
                       <span class="text-sm">({item.selectedOffer?.discount}% OFF)</span>
                     {:else if item.selectedOffer?.offerType === 'onMRP'}
@@ -716,7 +729,7 @@ validateStock();
                     {:else if item.selectedOffer?.offerType === 'Negotiate'}
                       <span class="text-xs">(Negotiated Price)</span>
                     {/if}
-                  {/if}
+                  {/if} -->
                 </p>
                 <p class="text-sm">
                   GST: {item.productId.gst}%
@@ -732,13 +745,13 @@ validateStock();
               ₹{item.totalAmount.toFixed(2)}
               <div
                 class={`quantity flex items-center justify-between border rounded-md
-                  ${item.productId.stock === 0 ? 'bg-[#e9e9eace] border-[#30363c6d]' : 'bg-[#F3FBFF] border-[#0EA5E9]'}
+                  ${item.productId.stock === 0 ? 'bg-primary/10 border-[#30363c6d]' : 'bg-primary/10 border-primary'}
                 `}
               >
                 <button
                   on:click={() => updateQuantity(item.productId._id, -1, item.productId.stock)}
                   class={`w-7.5 h-7.5 pl-2 border-gray-300 text-base flex items-center justify-center
-                    ${item.quantity <= (item.selectedOffer?.offerType === 'Negotiate' && item.productId.negMOQ ? item.productId.negMOQ : 1) || item.productId.stock === 0 ? 'text-[#30363c6d] cursor-not-allowed' : 'text-[#01A0E2] cursor-pointer'}
+                    ${item.quantity <= (item.selectedOffer?.offerType === 'Negotiate' && item.productId.negMOQ ? item.productId.negMOQ : 1) || item.productId.stock === 0 ? 'text-[#30363c6d] cursor-not-allowed' : 'text-primary cursor-pointer'}
                   `}
                   disabled={$updateQuantityMutation.isPending || item.quantity <= (item.selectedOffer?.offerType === 'Negotiate' && item.productId.negMOQ ? item.productId.negMOQ : 1) || item.productId.stock === 0}
                 >
@@ -754,7 +767,7 @@ validateStock();
                 <button
                   on:click={() => updateQuantity(item.productId._id, 1, item.productId.stock)}
                   class={`w-7.5 h-7.5 pr-2 border-gray-300 text-base flex items-center justify-center
-                    ${item.productId.stock === 0 ? 'text-[#30363c6d] cursor-not-allowed' : 'text-[#01A0E2] cursor-pointer'}
+                    ${item.productId.stock === 0 ? 'text-[#30363c6d] cursor-not-allowed' : 'text-primary cursor-pointer'}
                   `}
                   disabled={$updateQuantityMutation.isPending || item.productId.stock === 0}
                 >
@@ -777,7 +790,7 @@ validateStock();
     <div class="cart-items hidden lg:block bg-white rounded-lg shadow-lg p-2 lg:w-[75%] h-fit border">
       <div class="cart-header flex items-center justify-between text-sm py-2 text-[#475156] border border-gray-300 bg-[#F2F4F5]">
         <span style="width: 30%; text-align: center;">PRODUCT</span>
-        <span style="width: 13%; text-align: center;">HSN CODE</span>
+        <!-- <span style="width: 13%; text-align: center;">HSN CODE</span> -->
         <span style="width: 13%; text-align: center;">PRICE</span>
         <span style="width: 13%; text-align: center;">GST (%)</span>
         <span style="width: 13%; text-align: center;">OFFER</span>
@@ -831,20 +844,19 @@ validateStock();
                       goto(`/Products/${item.productId._id}`)
                     }
                   }}
-                  class={`cursor-pointer font-bold text-lg mb-0.5 ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C] hover:underline hover:text-[#01A0E2]'}`}
+                  class={`cursor-pointer font-bold text-lg mb-0.5 ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C] hover:underline hover:scale-105'}`}
                 >
                   {item.productId.productName}
                 </p>
               </div>
             </div>
-            <div style="width: 13%;" class={`item-price text-center font-semibold text-base ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C]'}`}>
+            <!-- <div style="width: 13%;" class={`item-price text-center font-semibold text-base ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C]'}`}>
               {item.productId.HSNCode || '-'}
-            </div>
+            </div> -->
             <div style="width: 13%;" class={`item-price text-center font-semibold text-base ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C]'}`}>
-              {#if item?.selectedOffer?.offerType != 'onMRP' && item?.selectedOffer?.offerType != null}
+
                 <span class="line-through pr-1">₹{item.productId.price}</span>
-              {/if}
-              ₹{item.price.toFixed(2)}
+     <span class='text-green-600'>         ₹{item.price.toFixed(2)} </span>
             </div>
             <div style="width: 13%;" class={`item-price text-center font-semibold text-base ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C]'}`}>
               {item.productId.gst}%
@@ -853,31 +865,8 @@ validateStock();
               style="width: 13%;"
               class={`item-offer text-center font-semibold text-base ${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#30363C]'}`}
             >
-              {#if item?.selectedOffer}
-                {#if item?.selectedOffer?.offerType === 'Discount'}
-                  <div class={`${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#249B3E]'}`}>Discount</div>
-                  <span class="text-sm">{item.selectedOffer?.discount}% OFF</span>
-                {:else if item.selectedOffer?.offerType === 'onMRP'}
-                  <div class="flex flex-col items-center">
-                    <span class={`${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#249B3E]'}`}>On MRP</span>
-                    {#if item.selectedOffer?.onMRP?.subType === 'Need'}
-                      <span class="text-sm">{item.selectedOffer?.onMRP?.reductionValue} OFF</span>
-                      <span class="text-xs">{item.selectedOffer?.onMRP?.message}</span>
-                    {:else}
-                      <span class="text-sm">₹{item.selectedOffer?.onMRP.reductionValue} OFF (Complementary)</span>
-                    {/if}
-                  </div>
-                {:else if item.selectedOffer?.offerType === 'Flat'}
-                  <div>
-                    <div class={`${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#249B3E]'}`}>Flat</div>
-                    <span class="text-sm">{item.selectedOffer.discount}% OFF</span>
-                  </div>
-                {:else if item.selectedOffer?.offerType === 'Negotiate'}
-                  <div class="flex flex-col items-center">
-                    <span class={`${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#249B3E]'}`}>Negotiated</span>
-                    <span class="text-sm">₹{item.selectedOffer?.negotiate.negotiatedPrice.toFixed(2)}</span>
-                  </div>
-                {/if}
+           {#if (item.productId.discount)}
+{item.productId.discount}%
               {:else}
                 <span class="text-gray-400">-</span>
               {/if}
@@ -888,7 +877,7 @@ validateStock();
             <div
               style="width: 13%;"
               class={`quantity flex items-center justify-between border rounded-md
-                ${item.productId.stock === 0 ? 'bg-[#e9e9eace] border-[#30363c6d]' : 'bg-[#F3FBFF] border-[#0EA5E9]'}
+                ${item.productId.stock === 0 ? 'bg-[#e9e9eace] border-[#30363c6d]' : 'bg-[#F3FBFF] border-priimary'}
               `}
             >
               <button
@@ -910,7 +899,7 @@ validateStock();
               <button
                 on:click={() => updateQuantity(item.productId._id, 1, item.productId.stock)}
                 class={`w-7.5 h-7.5 pr-2 border-gray-300 text-base flex items-center justify-center
-                  ${item.productId.stock === 0 ? 'text-[#30363c6d] cursor-not-allowed' : 'text-[#01A0E2] cursor-pointer'}
+                  ${item.productId.stock === 0 ? 'text-[#30363c6d] cursor-not-allowed' : 'text-primary cursor-pointer'}
                 `}
                 disabled={$updateQuantityMutation.isPending || item.productId.stock === 0}
               >
@@ -934,7 +923,7 @@ validateStock();
         <div class="rounded-lg p-1 text-sm text-yellow-600">
           <Icon icon="mdi:information" class="w-5 h-5 inline mr-1" />
           {cartItems.find(item => item.productId.flat)?.productId?.productName} has a flat {cartItems.find(item => item.productId.flat)?.productId.flat}% discount.
-          To avail Flat discount, Please add one more product from Flat Offer. <span class="text-blue-500 underline mx-1" on:click={()=>{goto("/offers")}}>Visit?</span>
+          To avail Flat discount, Please add one more product from Flat Offer. <span class="text-primary underline mx-1" on:click={()=>{goto("/offers")}}>Visit?</span>
         </div>
       {/if}
     </div>
@@ -989,7 +978,7 @@ validateStock();
                   <button
                     disabled={couponDiscount > 0 || isApplying}
                     on:click={() => {$cartQuery.refetch()}}
-                    class="absolute right-1 top-1/2 transform -translate-y-1/2 bg-white text-priimary text-sm px-2 py-0.5 rounded-md hover:bg-gray-100"
+                    class="absolute right-1 top-1/2 transform -translate-y-1/2 bg-white text-primary text-sm px-2 py-0.5 rounded-md hover:bg-gray-100"
                   >
                     {#if isApplying}
                       <Icon icon="mdi:loading" class="w-5 h-5 animate-spin" />
@@ -1047,7 +1036,7 @@ validateStock();
 {:else}
 <div class="container max-w-2xl my-20 py-20 rounded-lg shadow-lg flex-col gap-3 flex justify-center items-center">
   <p class="text-lg font-medium">Please login to access Cart</p>
-  <button on:click={() => goto('/login')} class="bg-[#01A0E2] hover:bg-[#01A0E2] rounded-lg px-4 text-lg text-white py-2">Login</button>
+  <button on:click={() => goto('/login')} class="bg-custom-gradient hover:scale-105 rounded-lg px-4 text-lg text-white py-2">Login</button>
 </div>
 {/if}
 
