@@ -21,6 +21,10 @@ export const _productsSchema = z.object({
   productName: z
     .string({ message: 'Name is required' })
     .max(50),
+    occasion: z
+    .array(z.string()).min(1, { message: 'At least one occasion is required' }),
+    ageGroups: z
+    .array(z.string()).min(1, { message: 'At least one age group is required' }),
   category: z
     .string({ message: 'Category is required' })
     .min(1),
@@ -78,7 +82,7 @@ export const productEditStore = writable({
   mode: 'list',
   id: '',
   category: {} as TCategory,
-  group: [] as array[],
+  group: [] as Array[],
   description: '',
   productName: '',
   brand: {} as TBrand,
@@ -91,6 +95,8 @@ export const productEditStore = writable({
   topSeller: null as boolean | null,
   images: '',
   gst: '',
+  occations: [] as string[],
+  ageGroups: [] as string[],
   stock: '',
   active: true,
   options: [] as Option[],

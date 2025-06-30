@@ -18,12 +18,41 @@
 	import { z } from 'zod';
 	import { isAxiosError } from 'axios';
   
+
+	let ageGroup = [
+    { _id: '1', name: 'Kids' },
+    { _id: '2', name: 'Adults' }
+  ];
+
+  let OccationsData = [
+    { _id: '1', name: 'Diwali' },
+    { _id: '2', name: 'New Year' },
+    { _id: '3', name: 'Christmas' },
+    { _id: '4', name: 'Wedding Celebration' },
+    { _id: '5', name: 'Birthday Party' },
+    { _id: '6', name: 'Anniversary' },
+    { _id: '7', name: 'Pongal' },
+    { _id: '8', name: 'Eid' },
+    { _id: '9', name: 'Independence Day' },
+    { _id: '10', name: 'Navratri' },
+    { _id: '11', name: 'Housewarming' },
+    { _id: '12', name: 'Temple Festival' },
+    { _id: '13', name: 'Corporate Event' },
+    { _id: '14', name: 'Victory Celebration' }
+  ];
+
 	// Specification Schema
 	const _specificationSchema = z.object({
 	  name: z.string({ message: 'Specification name is required' }).min(1, 'Specification name is required'),
 	  fields: z.array(z.string({ message: 'Field is required' }).min(1, 'Field cannot be empty')),
 	});
   
+	let selectedOccasions = $state<string[]>([]);
+  let selectedAgeGroups = $state<string[]>([]);
+  let selectOccasionOpen = $state(false);
+  let selectAgeGroupOpen = $state(false);
+
+
 	// Fetch functions
 	async function fetchCategories() {
 	  const res = await _axios.get(`/productcategory/select`);
@@ -394,6 +423,12 @@ const createBrandMutation = createMutation({
 		  for (const groupId of groupIds) {
     formdata.append('groups', groupId);
   }
+  for (const occasion of selectedOccasions) {
+      formdata.append('occations', occasion);
+    }
+    for (const ageGroup of selectedAgeGroups) {
+      formdata.append('ageGroup', ageGroup);
+    }
 		  formdata.append('unit', $form.unit.split(' -&- ')[0]);
 		  formdata.append('price', $form.price);
 		  formdata.append('discount', $form.discount);
@@ -933,7 +968,75 @@ function openGroupPopup() {
 		  <span class="invalid text-xs text-red-500">{$errors.gst}</span>
 		{/if}
 	  </div>
-  
+  <div class="col-span-2 grid grid-cols-2 gap-4">
+  <!-- Occasions Select -->
+  <div>
+    <Label for="occasions">Occasions</Label>
+    <Select.Root
+      type="multiple"
+      name="occasions"
+      bind:open={selectOccasionOpen}
+      bind:value={selectedOccasions}
+      onValueChange={(value) => {
+        if (!Array.isArray(value)) {
+          value = [value];
+        }
+        selectedOccasions = value;
+      }}
+    >
+      <Select.Trigger class="pr-10 mt-1">
+        {#if selectedOccasions.length > 0}
+          {selectedOccasions.map((val) => OccationsData.find(occ => occ.name === val)?.name).join(', ')}
+        {:else}
+          Select Occasions
+        {/if}
+      </Select.Trigger>
+      <Select.Content class="max-h-[200px]">
+        <Select.Group>
+          {#each OccationsData as occasion}
+            <Select.Item value={occasion.name} label={occasion.name}>
+              {occasion.name}
+            </Select.Item>
+          {/each}
+        </Select.Group>
+      </Select.Content>
+    </Select.Root>
+  </div>
+
+  <!-- Age Groups Select -->
+  <div>
+    <Label for="ageGroups">Age Groups</Label>
+    <Select.Root
+      type="multiple"
+      name="ageGroups"
+      bind:open={selectAgeGroupOpen}
+      bind:value={selectedAgeGroups}
+      onValueChange={(value) => {
+        if (!Array.isArray(value)) {
+          value = [value];
+        }
+        selectedAgeGroups = value;
+      }}
+    >
+      <Select.Trigger class="pr-10 mt-1">
+        {#if selectedAgeGroups.length > 0}
+          {selectedAgeGroups.map((val) => ageGroup.find(ag => ag.name === val)?.name).join(', ')}
+        {:else}
+          Select Age Groups
+        {/if}
+      </Select.Trigger>
+      <Select.Content class="max-h-[200px]">
+        <Select.Group>
+          {#each ageGroup as ageGroupItem}
+            <Select.Item value={ageGroupItem.name} label={ageGroupItem.name}>
+              {ageGroupItem.name}
+            </Select.Item>
+          {/each}
+        </Select.Group>
+      </Select.Content>
+    </Select.Root>
+  </div>
+</div>
 	  <!-- Specifications Section -->
 	  <div>
 		<Label for="specifications">Specifications</Label>

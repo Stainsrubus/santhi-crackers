@@ -154,7 +154,24 @@
     enabled: $writableGlobalStore.isLogedIn,
   });
 
-  
+  const groupQuery = createQuery({
+  queryKey: ['group'],
+  queryFn: async () => {
+    const response = await _axios.get('/group/all', {
+      headers: {
+          'Content-Type': 'application/json',
+        },
+    });
+
+    if (!response.data.status && response.data.message !== "No active group data found") {
+      throw new Error(response.data.message || 'Failed to fetch groups');
+    }
+
+    return response.data.groups || []; 
+  },
+  retry: 1,
+  staleTime: 0,
+});
   const hasNewNotificationsQuery = createQuery<{ hasNew: boolean }>({
     queryKey: ['hasNewNotifications'],
     queryFn: async () => {
@@ -408,9 +425,12 @@
   $: currentPath = $page.url.pathname;
   $: cartCount = $writableGlobalStore.isLogedIn ? ($cartCountQuery.data?.count || 0) : 0;
   $: wishCount = $writableGlobalStore.isLogedIn ? ($wishCountQuery.data?.count || 0) : 0;
+  $: groupData = $writableGlobalStore.isLogedIn ? ($groupQuery.data || null) : null;
   $: isLoading = $cartCountQuery.isLoading;
   $: error = $cartCountQuery.error ? ($cartCountQuery.error as Error).message : null;
-
+  $: if ($groupQuery.error) {
+  console.error('Group query error:', $groupQuery.error.message);
+}
   $: primaryAddress = $writableGlobalStore.isLogedIn && $addressesQuery.data
     ? $addressesQuery.data.find(addr => addr.isPrimary)
     : null;
@@ -625,7 +645,7 @@
   // console.log(cartCount)
 </script>
 
-<div class="flex items-center justify-between h-[70px] z-50 w-screen lg:px-10 md:px-5 px-2 bg-white shadow-md">
+<div class="flex items-center justify-between h-[70px] z-50 w-screen lg:px-10 md:px-5 px-2 bg-white shadow-lg">
   <!-- Left Section: Logo and Address -->
   <div class="flex items-center md:gap-4 gap-1">
     <!-- Logo -->
@@ -914,9 +934,40 @@
         {/if}
       </div>
 </div>
-   
 </div>
-
+<div class="py-2 bg-light overflow-x-auto">
+  <div class="flex items-center h-full min-w-max px-10 gap-6">
+    {#if $groupQuery.isLoading}
+    <div class="gap-5 flex items-center justify-start">
+      {#each Array(5) as _}
+      <div class="">
+        <Skeleton class="h-5 w-20" />
+      </div>
+      {/each}
+    </div>
+    {:else if $groupQuery.error}
+      <div class="text-red-500 text-lg font-semibold">Error loading groups: {$groupQuery.error.message}</div>
+    {:else if $groupQuery.data}
+      <!-- Display your group data here -->
+      {#each $groupQuery.data as group}
+        <div
+        onclick={() => {
+        goto(`/Products?group=${group._id}`);
+        }}
+        class="flex items-center gap-2 shrink-0 hover:underline hover:scale-105 transition-all cursor-pointer">
+          <img 
+            src={imgUrl + group.image || '/wholesale.png'} 
+            alt={group.name} 
+            class="w-6 h-6  object-contain" 
+          />
+          <p class="text-primary capitalize text-base font-bold whitespace-nowrap">
+            {group.name}
+          </p> 
+        </div>
+      {/each}
+    {/if}
+  </div>
+</div>
 
 <!-- Notification Dropdown -->
 {#if $writableGlobalStore.isLogedIn}

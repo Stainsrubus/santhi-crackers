@@ -196,7 +196,7 @@ return response.data;
             if (category.label === 'View More') {
               goto('/Products');
             } else {
-              goto(`/Products?${category._id}`);
+              goto(`/Products?category=${category._id}`);
             }
           }}
           class="flex flex-col w-fit items-center cursor-pointer"

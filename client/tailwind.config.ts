@@ -18,8 +18,11 @@ const config: Config = {
 			backgroundImage: {
 				'custom-gradient': " linear-gradient(90deg, #300E57 -22.97%, #56298A 47.76%, #300E57 121.27%)",
 				'header-gradient': "linear-gradient(176.49deg, #F5EDFF 16.01%, #FFFFFF 29.24%)",
+				// 'topbar-gradient': "linear-gradient(to bottom, #F5EDFF 0%, #F5EDFF 50%, #FFFFFF 100%)",
+				'topbar-gradient': "linear-gradient(to bottom, #D9C4FF 0%, #D9C4FF 80%)",
 			  },
 			colors: {
+				light:"#F5EDFF",
 				border: "hsl(var(--border) / <alpha-value>)",
 				input: "hsl(var(--input) / <alpha-value>)",
 				ring: "hsl(var(--ring) / <alpha-value>)",
@@ -53,6 +56,7 @@ const config: Config = {
 					DEFAULT: "hsl(var(--card) / <alpha-value>)",
 					foreground: "hsl(var(--card-foreground) / <alpha-value>)"
 				},
+				
 				sidebar: {
 					DEFAULT: "hsl(var(--sidebar-background))",
 					foreground: "hsl(var(--sidebar-foreground))",

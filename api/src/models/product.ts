@@ -17,6 +17,8 @@ interface ProductInterface {
   gst: number;
   discount: number;
   stock:number;
+  ageGroup:string[];
+  occations: string[];
   brand:Types.ObjectId;
   active: boolean;
   unit: Types.ObjectId
@@ -66,6 +68,8 @@ const ProductSchema = new Schema<ProductInterface>(
       // required: true,
       default: 1,
     },
+ageGroup:[String],
+occations:[String],
     productCode: {
       type: String,
       required: true,

@@ -14,12 +14,25 @@ export const productController = new Elysia({
   },
 })
 .get("/", async ({ query }) => {
-  const { page, limit, q, rating, userId, category, brand, minPrice, maxPrice } = query;
+  const {
+    page,
+    limit,
+    q,
+    rating,
+    userId,
+    category,
+    brand,
+    group,
+    minPrice,
+    maxPrice,
+    occations,
+    ageGroups
+  } = query;
 
-  const _limit = parseInt(limit as any) || 10;
-  const _page = parseInt(page as any) || 1;
+  const _limit = parseInt(limit) || 10;
+  const _page = parseInt(page) || 1;
 
-  let matchFilter: any = { active: true, isDeleted: false };
+  let matchFilter = { active: true, isDeleted: false };
 
   if (q) {
     matchFilter.$or = [{ productName: { $regex: q, $options: "i" } }];
@@ -38,40 +51,45 @@ export const productController = new Elysia({
     if (maxPrice) matchFilter.price.$lte = parseFloat(maxPrice);
   }
 
-  // Apply category filter if category is provided
   if (category) {
-    const categoryIds = category.split(',').map((id: string) => {
-      try {
-        return new Types.ObjectId(id.trim());
-      } catch (e) {
-        console.error(`Invalid category ID: ${id}`);
-        return null;
-      }
-    }).filter(Boolean); // Filter out any invalid IDs
-
+    const categoryIds = category.split(',').map(id => new Types.ObjectId(id.trim())).filter(Boolean);
     if (categoryIds.length > 0) {
       matchFilter.category = { $in: categoryIds };
     }
   }
 
-  // Apply brand filter if brand is provided
   if (brand) {
-    const brandIds = brand.split(',').map((id: string) => {
-      try {
-        return new Types.ObjectId(id.trim());
-      } catch (e) {
-        console.error(`Invalid brand ID: ${id}`);
-        return null;
-      }
-    }).filter(Boolean); // Filter out any invalid IDs
-
+    const brandIds = brand.split(',').map(id => new Types.ObjectId(id.trim())).filter(Boolean);
     if (brandIds.length > 0) {
       matchFilter.brand = { $in: brandIds };
     }
   }
 
+  // Fix for group filtering - filter by groups array field
+  if (group) {
+    const groupIds = group.split(',').map(id => new Types.ObjectId(id.trim())).filter(Boolean);
+    if (groupIds.length > 0) {
+      matchFilter.groups = { $in: groupIds };
+    }
+  }
+
+  if (occations) {
+    const occasionNames = occations.split(',').map(name => name.trim());
+    if (occasionNames.length > 0) {
+      matchFilter.$or = matchFilter.$or || [];
+      matchFilter.$or.push({ occations: { $in: occasionNames } });
+    }
+  }
+
+  if (ageGroups) {
+    const ageGroupNames = ageGroups.split(',').map(name => name.trim());
+    if (ageGroupNames.length > 0) {
+      matchFilter.ageGroup = { $in: ageGroupNames };
+    }
+  }
+
   try {
-    const aggregationPipeline: any[] = [
+    const aggregationPipeline = [
       { $match: matchFilter },
       {
         $lookup: {
@@ -101,6 +119,16 @@ export const productController = new Elysia({
       },
       { $unwind: "$unitDetails" },
       {
+        $lookup: {
+          from: "groups",
+          localField: "groups",
+          foreignField: "_id",
+          as: "groupDetails",
+        },
+      },
+      // Don't unwind groupDetails since a product can belong to multiple groups
+      // Instead, we'll handle multiple groups in the projection
+      {
         $addFields: {
           available: {
             $cond: [{ $gt: ["$stock", 0] }, true, false]
@@ -117,25 +145,26 @@ export const productController = new Elysia({
           images: 1,
           discount: 1,
           onMRP: 1,
-          unit: 1,
-          description: 1,
           unit: "$unitDetails.name",
           categoryId: "$categoryDetails._id",
           categoryName: "$categoryDetails.name",
           brandId: "$brandDetails._id",
           brandName: "$brandDetails.name",
-          available: 1
+          available: 1,
+          occations: 1,
+          ageGroup: 1,
+          groups: "$groupDetails" // This will be an array of group objects
         }
       }
     ];
 
     const allProducts = await Product.aggregate(aggregationPipeline);
 
-    let userFavorites: string[] = [];
+    let userFavorites = [];
 
     if (userId) {
       const favorites = await Favorites.findOne({ user: userId });
-      userFavorites = favorites?.products?.map((p: any) => p.toString()) || [];
+      userFavorites = favorites?.products?.map((p) => p.toString()) || [];
     }
 
     const total = allProducts.length;
@@ -159,26 +188,191 @@ export const productController = new Elysia({
       message: "Something went wrong",
     };
   }
-},
-{
-  detail: {
-    summary: "Get all active products with filters",
-    description: "Supports filtering by multiple categories, brands, price ranges, and ratings. Categories and brands can be comma-separated for multiple values."
-  },
-  query: t.Object({
-    page: t.Optional(t.Number({ default: 1 })),
-    limit: t.Optional(t.Number({ default: 10 })),
-    q: t.Optional(t.String({ default: "" })),
-    rating: t.Optional(t.String()),
-    userId: t.Optional(t.String()),
-    category: t.Optional(t.String({ description: "Comma-separated category IDs" })),
-    brand: t.Optional(t.String({ description: "Comma-separated brand IDs" })),
-    minPrice: t.Optional(t.String()),
-    maxPrice: t.Optional(t.String()),
-  }),
 })
 
+// Alternative approach if you want to flatten products by groups
+// (This will create separate entries for each group a product belongs to)
+.get("/flattened", async ({ query }) => {
+  const {
+    page,
+    limit,
+    q,
+    rating,
+    userId,
+    category,
+    brand,
+    group,
+    minPrice,
+    maxPrice,
+    occations,
+    ageGroups
+  } = query;
 
+  const _limit = parseInt(limit) || 10;
+  const _page = parseInt(page) || 1;
+
+  let matchFilter = { active: true, isDeleted: false };
+
+  if (q) {
+    matchFilter.$or = [{ productName: { $regex: q, $options: "i" } }];
+  }
+
+  if (rating) {
+    const ratingNumber = parseInt(rating, 10);
+    if (ratingNumber >= 1 && ratingNumber <= 5) {
+      matchFilter.ratings = ratingNumber;
+    }
+  }
+
+  if (minPrice || maxPrice) {
+    matchFilter.price = {};
+    if (minPrice) matchFilter.price.$gte = parseFloat(minPrice);
+    if (maxPrice) matchFilter.price.$lte = parseFloat(maxPrice);
+  }
+
+  if (category) {
+    const categoryIds = category.split(',').map(id => new Types.ObjectId(id.trim())).filter(Boolean);
+    if (categoryIds.length > 0) {
+      matchFilter.category = { $in: categoryIds };
+    }
+  }
+
+  if (brand) {
+    const brandIds = brand.split(',').map(id => new Types.ObjectId(id.trim())).filter(Boolean);
+    if (brandIds.length > 0) {
+      matchFilter.brand = { $in: brandIds };
+    }
+  }
+
+  if (occations) {
+    const occasionNames = occations.split(',').map(name => name.trim());
+    if (occasionNames.length > 0) {
+      matchFilter.$or = matchFilter.$or || [];
+      matchFilter.$or.push({ occations: { $in: occasionNames } });
+    }
+  }
+
+  if (ageGroups) {
+    const ageGroupNames = ageGroups.split(',').map(name => name.trim());
+    if (ageGroupNames.length > 0) {
+      matchFilter.ageGroup = { $in: ageGroupNames };
+    }
+  }
+
+  try {
+    const aggregationPipeline = [
+      { $match: matchFilter },
+      {
+        $lookup: {
+          from: "productcategories",
+          localField: "category",
+          foreignField: "_id",
+          as: "categoryDetails",
+        },
+      },
+      { $unwind: "$categoryDetails" },
+      {
+        $lookup: {
+          from: "brands",
+          localField: "brand",
+          foreignField: "_id",
+          as: "brandDetails",
+        },
+      },
+      { $unwind: "$brandDetails" },
+      {
+        $lookup: {
+          from: "units",
+          localField: "unit",
+          foreignField: "_id",
+          as: "unitDetails",
+        },
+      },
+      { $unwind: "$unitDetails" },
+      {
+        $lookup: {
+          from: "groups",
+          localField: "groups",
+          foreignField: "_id",
+          as: "groupDetails",
+        },
+      },
+      // Unwind groups to create separate entries for each group
+      { $unwind: { path: "$groupDetails", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          available: {
+            $cond: [{ $gt: ["$stock", 0] }, true, false]
+          }
+        }
+      }
+    ];
+
+    // Add group filter after lookup and unwind
+    if (group) {
+      const groupIds = group.split(',').map(id => new Types.ObjectId(id.trim())).filter(Boolean);
+      if (groupIds.length > 0) {
+        aggregationPipeline.push({
+          $match: {
+            "groupDetails._id": { $in: groupIds }
+          }
+        });
+      }
+    }
+
+    aggregationPipeline.push({
+      $project: {
+        _id: 1,
+        productName: 1,
+        price: 1,
+        ratings: 1,
+        strikePrice: 1,
+        images: 1,
+        discount: 1,
+        onMRP: 1,
+        unit: "$unitDetails.name",
+        categoryId: "$categoryDetails._id",
+        categoryName: "$categoryDetails.name",
+        brandId: "$brandDetails._id",
+        brandName: "$brandDetails.name",
+        available: 1,
+        occations: 1,
+        ageGroup: 1,
+        groups: "$groupDetails" // This will be a single group object per entry
+      }
+    });
+
+    const allProducts = await Product.aggregate(aggregationPipeline);
+
+    let userFavorites = [];
+
+    if (userId) {
+      const favorites = await Favorites.findOne({ user: userId });
+      userFavorites = favorites?.products?.map((p) => p.toString()) || [];
+    }
+
+    const total = allProducts.length;
+    const paginatedProducts = allProducts.slice((_page - 1) * _limit, _page * _limit).map(product => ({
+      ...product,
+      favorite: userFavorites.includes(product._id.toString()),
+    }));
+
+    return {
+      data: paginatedProducts,
+      total,
+      page: _page,
+      limit: _limit,
+      status: true,
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      error,
+      status: false,
+      message: "Something went wrong",
+    };
+  }
+})
 
 
   .get(

@@ -25,6 +25,7 @@ import { quoteController } from "./quote-controller";
 import { demandController } from "./demand-controller";
 import { userOfferController } from "./offer-controller";
 import { StoreController } from "./store-controller";
+import { groupController } from "./group-controller";
 
 const userBaseController = new Elysia({
   prefix: "/user",
@@ -40,7 +41,8 @@ const userBaseController = new Elysia({
   .use(StoreController)
   .use(termsandconditionsController)
   .use(privacyPolicyController)
-
+  .use(groupController)
+  
   .state("id", "")
   .state("mobile", "")
   .state("role", "")
