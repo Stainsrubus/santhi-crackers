@@ -141,7 +141,6 @@
     isConfirmationDialogOpen = false; // Close confirmation dialog, keep main dialog open
   }
   let selectedFileName = '';
-  let selectedFileName = '';
   let isUploading = false;
   let selectedFile: File | null = null;
   // Computed properties
@@ -602,11 +601,12 @@ validateStock();
       const file = input.files[0];
       selectedFile = file;
       selectedFileName = file.name;
-      
+
       // Trigger upload immediately
       if (file) {
         isUploading = true;
-        $uploadReceiptMutation.mutate(file);
+        console.log(file)
+        // $uploadReceiptMutation.mutate(file);
       }
     }
   }
@@ -1199,11 +1199,22 @@ validateStock();
                   
                   <!-- Footer -->
                   <div class="pt-4 flex items-center justify-center flex-col gap-3">
+                    <input
+                    id="file-upload"
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
+                    on:change={handleFileChange}
+                    class="hidden"
+                  />
                     <Button 
-                    onclick={(e)=>{triggerFileUpload(e)}}
+                    onclick={(e:any) => triggerFileUpload(e)}
                       class="w-full text-sm md:text-lg font-bold hover:text-white border-0 scale-95 text-white bg-custom-gradient  transition-all duration-300"
                     >
-                      Upload Receipt
+                    {#if isUploading}
+                    Uploading...
+                  {:else}
+                    Upload Receipt
+                  {/if}
                     </Button>
                     <div>
                       <p class="text-primary">Supported Size: 100kb</p>

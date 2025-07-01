@@ -3,90 +3,102 @@ import { model, Schema, Types } from "mongoose";
 interface OrderProduct {
   productId: Types.ObjectId;
   quantity: number;
-  selectedOffer: {
-    type: {
-      offerType: {
-        type: String,
-        enum: ['Discount', 'onMRP', 'Flat', 'Negotiate'],
-        required: true,
-      },
-      discount: Number,
-      onMRP: {
-        subType: {
-          type: String,
-          enum: ['Need', 'Complimentary'],
-        },
-        message: String,
-        productId: {
-          type: Types.ObjectId,
-          ref: "Product",
-        },
+  // selectedOffer: {
+  //   type: {
+  //     offerType: {
+  //       type: String,
+  //       enum: ['Discount', 'onMRP', 'Flat', 'Negotiate'],
+  //       required: true,
+  //     },
+  //     discount: Number,
+  //     onMRP: {
+  //       subType: {
+  //         type: String,
+  //         enum: ['Need', 'Complimentary'],
+  //       },
+  //       message: String,
+  //       productId: {
+  //         type: Types.ObjectId,
+  //         ref: "Product",
+  //       },
         
-        reductionValue: Number,
-      },
-      flatAmount: Number,
-      negotiate: {
-        negotiatedPrice: {
-          type: Number,
-        },
-        attempts: [{
-          amount: {
-            type: Number,
-          },
-          attemptNumber: {
-            type: Number,
-          },
-          _id: false
-        }],
-      },
-    },
-    required: false,
-  },
+  //       reductionValue: Number,
+  //     },
+  //     flatAmount: Number,
+  //     negotiate: {
+  //       negotiatedPrice: {
+  //         type: Number,
+  //       },
+  //       attempts: [{
+  //         amount: {
+  //           type: Number,
+  //         },
+  //         attemptNumber: {
+  //           type: Number,
+  //         },
+  //         _id: false
+  //       }],
+  //     },
+  //   },
+  //   required: false,
+  // },
   totalAmount: number;
-  customSuggestion?: string;
-  suggestions?: Types.ObjectId[];
+  // customSuggestion?: string;
+  // suggestions?: Types.ObjectId[];
   name: string;
   price: number;
 }
+
+
+
+interface PaymentImage {
+  image: string;
+  verified: boolean;
+}
+const PaymentImageSchema = new Schema<PaymentImage>({
+  image: { type: String, required: true },
+  verified: { type: Boolean, default: false }
+});
 
 interface Order {
   offerType: string;
   user: Types.ObjectId;
   products: OrderProduct[];
   addressId: Types.ObjectId;
-  deliveryAgent?: Types.ObjectId;
-  deliveryTime?: Date;
-  store?: Types.ObjectId;
+  // deliveryAgent?: Types.ObjectId;
+  // deliveryTime?: Date;
+  // store?: Types.ObjectId;
   deliverySeconds?: number;
   distance: string;
   coupon?: Types.ObjectId;
   couponCode: string;
   orderId: string;
+  paymentImages: PaymentImage[];
   couponDiscount: number;
   deliveryPrice: number;
-  platformFee: number;
+  // platformFee: number;
   subtotal: number;
   tax: number;
   totalPrice: number;
   status: string;
-  rating: Number;
-  feedback: string;
+  // rating: Number;
+  // feedback: string;
   invoiceId: string;
   paymentMethod: string;
-  paymentStatus: "pending" | "completed" | "failed";
-  preparationTime: number;
-  deliveryAgentCords?: {
-    lat: string;
-    lng: string;
-  };
-  mapPloygonResponse: string;
-  razorPayResponse: string;
-  razorOrderId: string;
-  tipsRazorPayId: string;
-  tipsRazorPayResponse: string;
-  tips: number;
-  preparedAt: Date;
-  razorPayId: string;
+  paymentStatus: "initiated" | "completed" | "failed";
+  // preparationTime: number;
+  // deliveryAgentCords?: {
+  //   lat: string;
+  //   lng: string;
+  // };
+  // mapPloygonResponse: string;
+  // razorPayResponse: string;
+  // razorOrderId: string;
+  // tipsRazorPayId: string;
+  // tipsRazorPayResponse: string;
+  // tips: number;
+  // preparedAt: Date;
+  // razorPayId: string;
   refunded: boolean;
   refundedAt: Date;
   refundedAmount: number;
@@ -105,85 +117,86 @@ const OrderSchema = new Schema<Order>(
     orderId: {
       type: String,
     },
+    paymentImages: [PaymentImageSchema],
     products: [
       {
         productId: {
           type: Schema.Types.ObjectId,
           ref: "Product",
         },
-        selectedOffer: {
-          type: {
-            offerType: {
-              type: String,
-              enum: ['Discount', 'onMRP', 'Flat', 'Negotiate'],
-              required: true,
-            },
-            discount: {
-              type: Number,
-              required: function() {
-                return this.offerType === 'Discount';
-              },
-            },
-            onMRP: {
-              type: {
-                subType: {
-                  type: String,
-                  enum: ['Need', 'Complementary'],
-                  required: true,
-                },
-                message: {
-                  type: String,
-                  required: function() {
-                    return this.subType === 'Need';
-                  },
-                },
-                productId: {
-                  type: Schema.Types.ObjectId,
-                  ref: "Product",
-                  required: function() {
-                    return this.subType === 'Complimentary';
-                  },
-                },
-                reductionValue: {
-                  type: Number,
-                  required: true,
-                },
-              },
-              required: function() {
-                return this.offerType === 'onMRP';
-              },
-            },
-            flatAmount: {
-              type: Number,
-              required: function() {
-                return this.offerType === 'Flat';
-              },
-            },
-            negotiate: {
-              type: {
-                negotiatedPrice: {
-                  type: Number,
-                },
-                attempts: [
-                  {
-                    amount: Number,
-                    attemptNumber: Number,
-                  },
-                ],
-              },
-              required: function() {
-                return this.offerType === 'Negotiate';
-              },
-            },
-          },
-          required: false,
-        },
-        options: [
-          {
-            title: String,
-            value: String,
-          },
-        ],
+        // selectedOffer: {
+        //   type: {
+        //     offerType: {
+        //       type: String,
+        //       enum: ['Discount', 'onMRP', 'Flat', 'Negotiate'],
+        //       required: true,
+        //     },
+        //     discount: {
+        //       type: Number,
+        //       required: function() {
+        //         return this.offerType === 'Discount';
+        //       },
+        //     },
+        //     onMRP: {
+        //       type: {
+        //         subType: {
+        //           type: String,
+        //           enum: ['Need', 'Complementary'],
+        //           required: true,
+        //         },
+        //         message: {
+        //           type: String,
+        //           required: function() {
+        //             return this.subType === 'Need';
+        //           },
+        //         },
+        //         productId: {
+        //           type: Schema.Types.ObjectId,
+        //           ref: "Product",
+        //           required: function() {
+        //             return this.subType === 'Complimentary';
+        //           },
+        //         },
+        //         reductionValue: {
+        //           type: Number,
+        //           required: true,
+        //         },
+        //       },
+        //       required: function() {
+        //         return this.offerType === 'onMRP';
+        //       },
+        //     },
+        //     flatAmount: {
+        //       type: Number,
+        //       required: function() {
+        //         return this.offerType === 'Flat';
+        //       },
+        //     },
+        //     negotiate: {
+        //       type: {
+        //         negotiatedPrice: {
+        //           type: Number,
+        //         },
+        //         attempts: [
+        //           {
+        //             amount: Number,
+        //             attemptNumber: Number,
+        //           },
+        //         ],
+        //       },
+        //       required: function() {
+        //         return this.offerType === 'Negotiate';
+        //       },
+        //     },
+        //   },
+        //   required: false,
+        // },
+        // options: [
+        //   {
+        //     title: String,
+        //     value: String,
+        //   },
+        // ],
         quantity: {
           type: Number,
           required: true,
@@ -194,10 +207,10 @@ const OrderSchema = new Schema<Order>(
           required: true,
           min: [0, "Total amount cannot be negative"],
         },
-        customSuggestion: {
-          type: String,
-          trim: true,
-        },
+        // customSuggestion: {
+        //   type: String,
+        //   trim: true,
+        // },
         // suggestions: [
         //   {
         //     type: Schema.Types.ObjectId,
@@ -217,11 +230,11 @@ const OrderSchema = new Schema<Order>(
       ref: "Address",
       required: true,
     },
-    store: {
-      type: Schema.Types.ObjectId,
-      ref: "Store",
-      required: true,
-    },
+    // store: {
+    //   type: Schema.Types.ObjectId,
+    //   ref: "Store",
+    //   required: true,
+    // },
     // deliveryAgent: {
     //   type: Schema.Types.ObjectId,
     //   ref: "DeliveryAgent",
@@ -230,16 +243,16 @@ const OrderSchema = new Schema<Order>(
     //   lat: String,
     //   lng: String,
     // },
-    mapPloygonResponse: {
-      type: String,
-      default: "",
-    },
-    deliveryTime: Date,
-    deliverySeconds: Number,
-    distance: String,
-    rating: Number,
+    // mapPloygonResponse: {
+    //   type: String,
+    //   default: "",
+    // },
+    // deliveryTime: Date,
+    // deliverySeconds: Number,
+    // distance: String,
+    // rating: Number,
     invoiceId: String,
-    feedback: String,
+    // feedback: String,
     coupon: {
       type: Schema.Types.ObjectId,
       ref: "Coupon",
@@ -254,11 +267,11 @@ const OrderSchema = new Schema<Order>(
       type: Number,
       min: [0, "Delivery price cannot be negative"],
     },
-    platformFee: {
-      type: Number,
-      default: 0,
-      min: [0, "Platform fee cannot be negative"],
-    },
+    // platformFee: {
+    //   type: Number,
+    //   default: 0,
+    //   min: [0, "Platform fee cannot be negative"],
+    // },
     subtotal: {
       type: Number,
       required: true,
@@ -284,33 +297,33 @@ const OrderSchema = new Schema<Order>(
     },
     paymentStatus: {
       type: String,
-      enum: ["pending", "completed", "failed"],
-      default: "pending",
+      enum: ["initiated", "completed", "failed"],
+      default: "initiated",
     },
-    razorPayResponse: {
-      type: String,
-      default: "",
-    },
-    razorOrderId: {
-      type: String,
-      default: "",
-    },
-    razorPayId: {
-      type: String,
-      default: "",
-    },
-    tipsRazorPayId: {
-      type: String,
-      default: "",
-    },
-    tipsRazorPayResponse: {
-      type: String,
-      default: "",
-    },
-    tips: {
-      type: Number,
-      default: 0,
-    },
+    // razorPayResponse: {
+    //   type: String,
+    //   default: "",
+    // },
+    // razorOrderId: {
+    //   type: String,
+    //   default: "",
+    // },
+    // razorPayId: {
+    //   type: String,
+    //   default: "",
+    // },
+    // tipsRazorPayId: {
+    //   type: String,
+    //   default: "",
+    // },
+    // tipsRazorPayResponse: {
+    //   type: String,
+    //   default: "",
+    // },
+    // tips: {
+    //   type: Number,
+    //   default: 0,
+    // },
     refunded:{
       type: Boolean,
       default: false
