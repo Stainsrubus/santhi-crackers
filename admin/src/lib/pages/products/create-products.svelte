@@ -134,63 +134,80 @@ let showGroupPopup = $state(false);
 		let showUnitPopup = $state(false);
   let newUnitName = $state('');
 
-	$effect(() => {
-	  if ($productEditStore.id) {
-		edit = true;
-		$form.category = $productEditStore.category?._id
-		  ? `${$productEditStore.category._id} -&- ${$productEditStore.category.name}`
-		  : '';
-		  $form.group = [$productEditStore.group?._id ? `${$productEditStore.group._id} -&- ${$productEditStore.group.name}` : ''];
-		$form.brand = $productEditStore.brand?._id
-		  ? `${$productEditStore.brand._id} -&- ${$productEditStore.brand.name}`
-		  : '';
-		  $form.unit = $productEditStore.unit?._id
-		  ? `${$productEditStore.unit._id} -&- ${$productEditStore.unit.name}`
-		  : '';
-		$form.description = $productEditStore.description || '';
-		$form.productName = $productEditStore.productName || '';
-		$form.price = $productEditStore.price ? String($productEditStore.price) : '';
-		$form.discount = $productEditStore.discount ? String($productEditStore.discount) : '';
-		$form.stock = $productEditStore.stock ? String($productEditStore.stock) : '';
-		$form.productCode = $productEditStore.productCode || '';
-		$form.topSeller = $productEditStore.topSeller ?? false;
-		$form.gst = $productEditStore.gst ? String($productEditStore.gst) : '';
-		$form.active = $productEditStore.active ?? true;
-  
-		existingImages = Array.isArray($productEditStore.images)
-		  ? $productEditStore.images
-		  : typeof $productEditStore.images === 'string' && $productEditStore.images
-		  ? [$productEditStore.images]
-		  : [];
-  
-		if ($productEditStore.specifications?.length > 0) {
-		  const availableSpecs = $specificationsQuery.data?.specifications || [];
-		  selectedSpecifications = $productEditStore.specifications
-			.map((storedSpec: any) => {
-			  const matchingSpec = availableSpecs.find((spec: any) => spec.name === storedSpec.name);
-			  return {
-				id: storedSpec._id || storedSpec.name,
-				name: storedSpec.name || matchingSpec?.name || 'Unknown',
-				fields:
-				  storedSpec.fields ||
-				  (matchingSpec
-					? Object.fromEntries(matchingSpec.fields.map((field: any) => [field, '']))
-					: {}),
-			  };
-			})
-			.filter((spec, index, self) => index === self.findIndex((s) => s.name === spec.name));
-		} else {
-		  selectedSpecifications = [];
-		}
-	  } else {
-		edit = false;
-		reset();
-		files = [];
-		existingImages = [];
-		// $form.groups = [];
-		selectedSpecifications = [];
-	  }
-	});
+  $effect(() => {
+  if ($productEditStore.id) {
+    edit = true;
+    $form.category = $productEditStore.category?._id
+      ? `${$productEditStore.category._id} -&- ${$productEditStore.category.name}`
+      : '';
+	  console.log($productEditStore.group,$productEditStore.group.map(g => `${g._id} -&- ${g.name}`));
+	  console.log($productEditStore.category)
+	  $form.group = $productEditStore.group.map(g => `${g._id} -&- ${g.name}`);
+	  $form.group = Array.isArray($productEditStore.group) && $productEditStore.group.length
+      ? $productEditStore.group.map(g => `${g._id} -&- ${g.name}`)
+      : [];
+	  $form.ytLink = $productEditStore.ytLink || '';
+	  $form.ageGroup = $productEditStore.ageGroup?.length
+      ? $productEditStore.ageGroup.map(g => `${g}`)
+      : [];
+	  $form.occasions = $productEditStore.occations?.length
+      ? $productEditStore.occations.map(g => `${g}`)
+      : [];
+    $form.brand = $productEditStore.brand?._id
+      ? `${$productEditStore.brand._id} -&- ${$productEditStore.brand.name}`
+      : '';
+    $form.unit = $productEditStore.unit?._id
+      ? `${$productEditStore.unit._id} -&- ${$productEditStore.unit.name}`
+      : '';
+    $form.description = $productEditStore.description || '';
+    $form.productName = $productEditStore.productName || '';
+    $form.price = $productEditStore.price ? String($productEditStore.price) : '';
+    $form.discount = $productEditStore.discount ? String($productEditStore.discount) : '';
+    $form.stock = $productEditStore.stock ? String($productEditStore.stock) : '';
+    $form.productCode = $productEditStore.productCode || '';
+    $form.topSeller = $productEditStore.topSeller ?? false;
+    $form.gst = $productEditStore.gst ? String($productEditStore.gst) : '';
+    $form.active = $productEditStore.active ?? true;
+
+    // Initialize occasions and ageGroup
+    selectedOccasions = $productEditStore.occations || [];
+    selectedAgeGroups = $productEditStore.ageGroup || [];
+
+    existingImages = Array.isArray($productEditStore.images)
+      ? $productEditStore.images
+      : typeof $productEditStore.images === 'string' && $productEditStore.images
+      ? [$productEditStore.images]
+      : [];
+
+    if ($productEditStore.specifications?.length > 0) {
+      const availableSpecs = $specificationsQuery.data?.specifications || [];
+      selectedSpecifications = $productEditStore.specifications
+        .map((storedSpec: any) => {
+          const matchingSpec = availableSpecs.find((spec: any) => spec.name === storedSpec.name);
+          return {
+            id: storedSpec._id || storedSpec.name,
+            name: storedSpec.name || matchingSpec?.name || 'Unknown',
+            fields:
+              storedSpec.fields ||
+              (matchingSpec
+                ? Object.fromEntries(matchingSpec.fields.map((field: any) => [field, '']))
+                : {}),
+          };
+        })
+        .filter((spec, index, self) => index === self.findIndex((s) => s.name === spec.name));
+    } else {
+      selectedSpecifications = [];
+    }
+  } else {
+    edit = false;
+    reset();
+    files = [];
+    existingImages = [];
+    selectedSpecifications = [];
+    selectedOccasions = [];
+    selectedAgeGroups = [];
+  }
+});
 	const createGroupMutation = createMutation({
         mutationFn: async (data: FormData) => {
             const response = await _axios.post('/group/create', data, {
@@ -352,6 +369,9 @@ const createBrandMutation = createMutation({
 			$productEditStore.category = { categoryNumber: 0, _id: '', name: '' };
 			$productEditStore.brand = { _id: '', name: '' };
 			$productEditStore.group = { _id: '', name: '' };
+			$productEditStore.ageGroup = [];
+			$productEditStore.ytLink = '';
+			$productEditStore.occations = [];
 			$productEditStore.unit = { _id: '', name: '' };
 			$productEditStore.description = '';
 			$productEditStore.productName = '';
@@ -391,61 +411,75 @@ const createBrandMutation = createMutation({
 		invalidateAll: false,
 		resetForm: false,
 		async onSubmit() {
-			const groupIds = Array.isArray($form.group)
-    ? $form.group.map(group => group.split(' -&- ')[0])
+  const groupIds = Array.isArray($form.group)
+    ? $form.group.map((group) => group.split(' -&- ')[0])
     : [];
-		  const { valid } = await validateForm({ focusOnError: true });
-		  if (!$form.category) {
-			toast.error('Please select a category');
-			return;
-		  }
-		  if (!valid) {
-			for (const field in $errors) {
-			  if ($errors[field]) {
-				toast.error(`${field}: ${$errors[field]}`);
-			  }
-			}
-			return;
-		  }
-		  if (files.length === 0 && (!edit || existingImages.length === 0)) {
-			toast.error('Please upload at least one image');
-			return;
-		  }
-		  if (!$form.unit) {
+
+	const ageGroups = Array.isArray($form.ageGroup)
+    ? $form.ageGroup.map((ageGroup) => ageGroup)
+    : [];
+	const occasionsData = Array.isArray($form.occasions)
+    ? $form.occasions.map((occasions) => occasions)
+    : [];
+  const { valid } = await validateForm({ focusOnError: true });
+
+  if (!$form.category) {
+    toast.error('Please select a category');
+    return;
+  }
+
+  if (!valid) {
+    for (const field in $errors) {
+      if ($errors[field]) {
+        toast.error(`${field}: ${$errors[field]}`);
+      }
+    }
+    return;
+  }
+
+  if (files.length === 0 && (!edit || existingImages.length === 0)) {
+    toast.error('Please upload at least one image');
+    return;
+  }
+
+  if (!$form.unit) {
     toast.error('Please select a unit');
     return;
   }
-  
-		  let formdata = new FormData();
-		  formdata.append('productName', $form.productName);
-		  formdata.append('category', $form.category.split(' -&- ')[0]);
-		  formdata.append('brand', $form.brand.split(' -&- ')[0]);
-		  for (const groupId of groupIds) {
-    formdata.append('groups', groupId);
-  }
-  for (const occasion of selectedOccasions) {
-      formdata.append('occations', occasion);
-    }
-    for (const ageGroup of selectedAgeGroups) {
-      formdata.append('ageGroup', ageGroup);
-    }
-		  formdata.append('unit', $form.unit.split(' -&- ')[0]);
-		  formdata.append('price', $form.price);
-		  formdata.append('discount', $form.discount);
-		  formdata.append('stock', String($form.stock));
-		  formdata.append('productCode', $form.productCode);
-		  formdata.append('description', $form.description);
-		  for (let img of files) {
-			formdata.append('images', img);
-		  }
-		  formdata.append('existingImages', JSON.stringify(existingImages));
-		  formdata.append('topSeller', $form.topSeller.toString());
-		  formdata.append('gst', $form.gst);
-		  formdata.append('specifications', JSON.stringify(selectedSpecifications));
-  
-		  console.log('Form Data:', Object.fromEntries(formdata.entries()));
-		  $createProductMutation.mutate(formdata);
-		},
+
+  let formData = new FormData();
+  formData.append('productName', $form.productName);
+  formData.append('ytLink', $form.ytLink);
+  formData.append('category', $form.category.split(' -&- ')[0]);
+  formData.append('brand', $form.brand.split(' -&- ')[0]);
+  ageGroups.forEach((ageGroup) => {
+    formData.append('ageGroup', ageGroup);
+  });
+  occasionsData.forEach((occasions) => {
+    formData.append('occations', occasions);
+  });
+  groupIds.forEach((groupId) => {
+    formData.append('groups', groupId);
+  });
+  formData.append('unit', $form.unit.split(' -&- ')[0]);
+  formData.append('price', $form.price);
+  formData.append('discount', $form.discount);
+  formData.append('stock', String($form.stock));
+  formData.append('productCode', $form.productCode);
+  formData.append('description', $form.description);
+
+  files.forEach((file) => {
+    formData.append('images', file);
+  });
+
+  formData.append('existingImages', JSON.stringify(existingImages));
+  formData.append('topSeller', $form.topSeller.toString());
+  formData.append('gst', $form.gst);
+  formData.append('specifications', JSON.stringify(selectedSpecifications));
+
+  console.log('Form Data:', Object.fromEntries(formData.entries()));
+  $createProductMutation.mutate(formData);
+}
 	  }
 	);
   
@@ -977,12 +1011,12 @@ function openGroupPopup() {
       name="occasions"
       bind:open={selectOccasionOpen}
       bind:value={selectedOccasions}
-      onValueChange={(value) => {
-        if (!Array.isArray(value)) {
-          value = [value];
-        }
-        selectedOccasions = value;
-      }}
+	  onValueChange={(value) => {
+		if (!Array.isArray(value)) {
+		  value = [value];
+		}
+		$form.occasions = value;
+	  }}
     >
       <Select.Trigger class="pr-10 mt-1">
         {#if selectedOccasions.length > 0}
@@ -1005,18 +1039,18 @@ function openGroupPopup() {
 
   <!-- Age Groups Select -->
   <div>
-    <Label for="ageGroups">Age Groups</Label>
+    <Label for="ageGroup">Age Groups</Label>
     <Select.Root
       type="multiple"
-      name="ageGroups"
+      name="ageGroup"
       bind:open={selectAgeGroupOpen}
       bind:value={selectedAgeGroups}
-      onValueChange={(value) => {
-        if (!Array.isArray(value)) {
-          value = [value];
-        }
-        selectedAgeGroups = value;
-      }}
+	  onValueChange={(value) => {
+		if (!Array.isArray(value)) {
+		  value = [value];
+		}
+		$form.ageGroup = value;
+	  }}
     >
       <Select.Trigger class="pr-10 mt-1">
         {#if selectedAgeGroups.length > 0}
@@ -1037,6 +1071,20 @@ function openGroupPopup() {
     </Select.Root>
   </div>
 </div>
+<div>
+	<Label>YouTube URL</Label>
+	<Input
+	  class="pr-10 mt-1"
+	  autocomplete="off"
+	  placeholder="https://www.youtube.com/shorts/212******65fg"
+	  aria-invalid={$errors.ytLink ? 'true' : undefined}
+	  bind:value={$form.ytLink}
+	  {...$constraints.ytLink}
+	/>
+	{#if $errors.ytLink}
+	  <span class="invalid text-xs text-red-500">{$errors.ytLink}</span>
+	{/if}
+  </div>
 	  <!-- Specifications Section -->
 	  <div>
 		<Label for="specifications">Specifications</Label>
@@ -1177,7 +1225,7 @@ function openGroupPopup() {
 		{/if}
 	  </div>
   
-	  <Button class="w-[100px]" type="submit" disabled={$createProductMutation.isPending}>
+	  <Button class="w-[100px]" type="submit" onclick={()=>{console.log($form)}} disabled={$createProductMutation.isPending}>
 		{$createProductMutation.isPending
 		  ? edit
 			? 'Updating...'

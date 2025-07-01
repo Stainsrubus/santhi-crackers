@@ -9,7 +9,8 @@
   import { imgUrl } from '$lib/config';
   import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { toast } from 'svelte-sonner';
-
+  import * as Dialog from '$lib/components/ui/dialog/index.js';
+  import { Button, buttonVariants } from "$lib/components/ui/button/index.js";
   // Component state
   let selectedImage = 0;
   let quantity = 1;
@@ -29,6 +30,72 @@
 	 */
   let productId = null;
 
+  /**
+	 * @param {string} url
+	 */
+  
+// Improved YouTube embed function
+// Improved YouTube embed function
+function getYouTubeEmbedUrl(url) {
+  if (!url) return '';
+  
+  // Remove any whitespace
+  url = url.trim();
+  
+  // Handle YouTube URL with timestamp (e.g., ?t=123 or &t=123)
+  const timePattern = /[?&]t=(\d+)/;
+  const timeMatch = url.match(timePattern);
+  const timeParam = timeMatch ? `&start=${timeMatch[1]}` : '';
+  
+  // Handle multiple YouTube URL formats
+  const patterns = [
+    // Standard watch URLs
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/,
+    // Short URLs
+    /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]+)/,
+    // Embed URLs
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]+)/,
+    // Mobile URLs
+    /(?:https?:\/\/)?m\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/,
+    // YouTube Shorts URLs
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/
+  ];
+  
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      // Return embed URL with proper parameters
+      return `https://www.youtube.com/embed/${match[1]}?rel=0&modestbranding=1&showinfo=0&controls=1&autoplay=1${timeParam}`;
+    }
+  }
+  
+  console.warn('Invalid YouTube URL:', url);
+  return '';
+}
+
+// Alternative: Direct video ID extraction if you have just the video ID
+function createEmbedFromVideoId(videoId, autoplay = false) {
+  if (!videoId) return '';
+  
+  const autoplayParam = autoplay ? '&autoplay=1' : '&autoplay=0';
+  return `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&controls=1${autoplayParam}`;
+}
+
+// Usage examples:
+const testUrls = [
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://youtu.be/dQw4w9WgXcQ',
+  'https://www.youtube.com/embed/dQw4w9WgXcQ',
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=30',
+  'https://m.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://www.youtube.com/shorts/he9P0oj1dzs'
+];
+
+testUrls.forEach(url => {
+  console.log(`Original: ${url}`);
+  console.log(`Embed: ${getYouTubeEmbedUrl(url)}`);
+  console.log('---');
+});
   // Reset product data and set initial loading state
   onMount(() => {
     queryClient.removeQueries(['product']);
@@ -59,7 +126,7 @@
       $productQuery.refetch();
     }
   }
-
+  let isVideoDialogOpen = false;
   const productQuery = createQuery({
     queryKey: ['product', productId],
     queryFn: async () => {
@@ -82,6 +149,7 @@
           id: product._id,
           name: product.productName,
           images: product.images || [],
+          ytLink: product.ytLink || '',
           discount: product.discount || 0,
           stock: product.stock || 0,
           flat: product.flat || 0,
@@ -472,6 +540,80 @@
         <div>
           <h3 class="text-lg font-semibold text-gray-900 mb-3">Description</h3>
           <div class="relative">
+      
+<!-- Improved YouTube Dialog Section with Shorts Support -->
+{#if $productQuery.data.ytLink}
+  <Dialog.Root bind:open={isVideoDialogOpen}>
+    <Dialog.Trigger 
+      class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline text-sm mb-2 font-medium transition-colors"
+    >
+      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+      </svg>
+      {$productQuery.data.ytLink.includes('/shorts/') ? 'Watch Shorts Video' : 'Watch Video Preview'}
+    </Dialog.Trigger>
+    
+    <Dialog.Content class={$productQuery.data.ytLink.includes('/shorts/') ? "sm:max-w-[500px] w-[95vw] max-h-[90vh] bg-transparent border-0" : "sm:max-w-[900px] w-[95vw] max-h-[90vh] bg-transparent border-0"}>
+      <Dialog.Header class="pb-4">
+        <!-- <Dialog.Title class="text-xl font-semibold">
+          {$productQuery.data.ytLink.includes('/shorts/') ? 'Shorts Video' : 'Video Preview'}
+        </Dialog.Title>
+        <Dialog.Description class="text-gray-600">
+          Watch the {$productQuery.data.ytLink.includes('/shorts/') ? 'shorts video' : 'video preview'} for {$productQuery.data.name}
+        </Dialog.Description> -->
+      </Dialog.Header>
+      
+      <div class="relative w-full bg-black rounded-lg overflow-hidden">
+        {#if getYouTubeEmbedUrl($productQuery.data.ytLink)}
+          <!-- Check if it's a shorts video for different aspect ratio -->
+          {#if $productQuery.data.ytLink.includes('/shorts/')}
+            <div class="relative w-full" style="aspect-ratio: 9/16; max-height: 600px;">
+              <iframe
+                src={getYouTubeEmbedUrl($productQuery.data.ytLink)}
+                title="Product Shorts Video - {$productQuery.data.name}"
+                class="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+                loading="lazy"
+              ></iframe>
+            </div>
+          {:else}
+            <div class="relative w-full aspect-video">
+              <iframe
+                src={getYouTubeEmbedUrl($productQuery.data.ytLink)}
+                title="Product Video Preview - {$productQuery.data.name}"
+                class="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;"
+                allowfullscreen
+                loading="lazy"
+              ></iframe>
+            </div>
+          {/if}
+        {:else}
+          <div class="w-full aspect-video flex items-center justify-center bg-gray-100 text-gray-500">
+            <div class="text-center">
+              <svg class="w-12 h-12 mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+              </svg>
+              <p>Invalid video URL</p>
+            </div>
+          </div>
+        {/if}
+      </div>
+      
+      <Dialog.Footer class="pt-4 ">
+        <Button 
+          variant="outline" 
+          onclick={() => isVideoDialogOpen = false}
+          class="w-full text-sm md:text-lg font-bold hover:text-white border-0 text-white  bg-custom-gradient hover:scale-110 transition-all duration-300"
+        >
+          Close
+        </Button>
+      </Dialog.Footer>
+    </Dialog.Content>
+  </Dialog.Root>
+{/if}
+
             <p
               bind:this={descriptionRef}
               class="text-gray-700 leading-relaxed transition-all duration-300 {!isDescriptionExpanded ? 'line-clamp-3' : ''}"

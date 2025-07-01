@@ -17,13 +17,14 @@ interface ProductInterface {
   gst: number;
   discount: number;
   stock:number;
-  ageGroup:string[];
-  occations: string[];
+  ageGroup: [String],
+  occations: [String],
   brand:Types.ObjectId;
   active: boolean;
   unit: Types.ObjectId
   isDeleted: boolean;
   reEnabledAt: Date | null;
+  ytLink:string;
   specifications?: Specification[];
   groups: Types.ObjectId[]; 
 }
@@ -40,6 +41,10 @@ const ProductSchema = new Schema<ProductInterface>(
       type: Schema.Types.ObjectId,
       ref: "ProductCategory",
       required: true,
+    },
+    ytLink: {
+      type: String,
+      default:""
     },
     unit: {
       type: Schema.Types.ObjectId,

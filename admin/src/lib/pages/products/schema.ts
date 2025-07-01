@@ -21,14 +21,18 @@ export const _productsSchema = z.object({
   productName: z
     .string({ message: 'Name is required' })
     .max(50),
-    occasion: z
+    ytLink: z.string().optional(),
+    occasions: z // Change from occasion to occasions
     .array(z.string()).min(1, { message: 'At least one occasion is required' }),
-    ageGroups: z
+  ageGroup: z
     .array(z.string()).min(1, { message: 'At least one age group is required' }),
+
+    group: z
+    .array(z.string()).min(1, { message: 'At least one group is required' }),
+    
   category: z
     .string({ message: 'Category is required' })
     .min(1),
-    group: z.array(z.string()).min(1, { message: 'At least one group is required' }),
   brand: z
     .string({ message: 'Brand is required' })
     .min(1),
@@ -82,9 +86,10 @@ export const productEditStore = writable({
   mode: 'list',
   id: '',
   category: {} as TCategory,
-  group: [] as Array[],
+ytLink: '',
   description: '',
   productName: '',
+  group: [] as TGroup[],
   brand: {} as TBrand,
   unit: {} as TUnit,
   price: '',
@@ -96,7 +101,7 @@ export const productEditStore = writable({
   images: '',
   gst: '',
   occations: [] as string[],
-  ageGroups: [] as string[],
+  ageGroup: [] as string[],
   stock: '',
   active: true,
   options: [] as Option[],

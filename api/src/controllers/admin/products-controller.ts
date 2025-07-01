@@ -26,6 +26,7 @@ export const productsController = new Elysia({
         category,
         brand,
         price,
+        ytLink,
         stock,
         unit,
         discount,
@@ -76,6 +77,7 @@ export const productsController = new Elysia({
         unit: _unit._id,
         discount: +discount,
         ageGroup,
+        ytLink,
         occations,
         // negotiateLimit:+negotiateLimit,
         images: _images,
@@ -116,13 +118,14 @@ export const productsController = new Elysia({
       category: t.String({}),
       unit: t.String({}),
       brand:t.String({}),
+      ytLink:t.String(),
       ratings: t.Number({ default: 5, examples: [5] }),
       images: t.Files(),
       productCode: t.String({ default: "123456", examples: ["123456"] }),
       price: t.String({ default: 100 }),
       discount: t.String({ default: 10 }),
-      ageGroup:t.Array(t.String()),
       occations: t.Array(t.String()),
+ageGroup: t.Array(t.String()),
       // HSNCode:t.String(),
       // negotiateLimit:t.String({default:0}),
       // strikePrice: t.String({ default: 150 }),
@@ -345,6 +348,10 @@ export const productsController = new Elysia({
           })
           .populate({
             path: "brand",
+            select: "name",
+          })
+          .populate({
+            path: "groups",
             select: "name",
           })
           .exec();
@@ -624,6 +631,7 @@ export const productsController = new Elysia({
           description,
           category,
           price,
+          ytLink,
           discount,
           // negotiateLimit,
           stock,
@@ -808,6 +816,7 @@ export const productsController = new Elysia({
             stock:stock?+stock:product.stock,
             occations: occations || product.occations,
             ageGroup: ageGroup || product.ageGroup,
+            ytLink: ytLink || product.ytLink,
             // negotiateLimit:negotiateLimit?+negotiateLimit:product.negotiateLimit,
             // strikePrice: strikePrice ? +strikePrice : product.strikePrice,
             // HSNCode:HSNCode||product.HSNCode,
@@ -856,6 +865,7 @@ export const productsController = new Elysia({
         brand: t.Optional(t.String()),
         price: t.Optional(t.String()),
         discount: t.Optional(t.String()),
+        ytLink:t.Optional(t.String()),
         stock:t.Optional(t.String()),
         // negotiateLimit:t.Optional(t.String()),
         // strikePrice: t.Optional(t.String()),

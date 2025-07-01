@@ -35,6 +35,9 @@
 				_id: '',
 				name: ''
 			};
+			$productEditStore.group = [];
+			$productEditStore.ageGroup = [];
+			$productEditStore.occations = [];
 			$productEditStore.description = '';
 			$productEditStore.productName = '';
 			$productEditStore.price = '';

@@ -13,7 +13,9 @@
   import { onMount } from 'svelte';
   import { loadRazorpay, initiatePayment } from '$lib/payment';
   import Razorpay from "razorpay";
-
+  import * as Dialog from '$lib/components/ui/dialog/index.js';
+  import { Button, buttonVariants } from "$lib/components/ui/button/index.js";
+	import { Copy } from "lucide-svelte";
   // Interfaces remain unchanged
   interface ProductDetails {
     HSNCode: any;
@@ -148,7 +150,16 @@
     );
     return flatOfferItems.length === 1;
   })();
-
+  async function copyToClipboard(text: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copied to clipboard!`);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      toast.error(`Failed to copy ${label.toLowerCase()}`);
+    }
+  }
+let isDialogOpen=false
   onMount(() => {
     showShimmer = true;
     $cartQuery.refetch();
@@ -1017,17 +1028,84 @@ validateStock();
             <span class="text-[#30363C] font-bold">Total Amount</span>
             <span class="text-gray-800">₹{totalPrice.toFixed(2)}</span>
           </div>
-          <button
-            on:click={handlePayNow}
-            class={`pay-now-btn w-full py-2.5 text-white rounded-md text-base mt-5 ${cartItems.length === 0 ? 'bg-[#30363c62] cursor-not-allowed' : 'bg-custom-gradient cursor-pointer'}`}
-            disabled={$placeOrderMutation.isPending || cartItems.length === 0 || isPaying}
-          >
+          <Dialog.Root bind:open={isDialogOpen}>
+            <Dialog.Trigger class="bg-custom-gradient cursor-pointer w-full mt-2 rounded-lg text-white p-1 font-bold">
+         
             {#if isPaying || $placeOrderMutation.isPending}
               Processing...
             {:else}
               PAY NOW
             {/if}
-          </button>
+
+            </Dialog.Trigger>
+            
+            <Dialog.Content class=" max-h-[90vh] bg-white border-0">
+              <Dialog.Header class="pb-4">
+               
+              </Dialog.Header>
+              
+              <div class="relative w-full rounded-lg overflow-hidden">
+                <p class="text-primary text-xl text-center">
+                  Make Payment Using
+                </p>
+                <p class="text-center">
+                  Scanner, Number & Bank account
+                </p>
+              <img src="/images/qr.jpeg" alt="">
+              <div class="flex items-center justify-center gap-2 mt-2">
+                <p class="text-lg">UPI ID: stains@okaxis</p>
+                <button
+                  on:click={() => copyToClipboard('stains@okaxis', 'UPI ID')}
+                  class="p-1 hover:bg-gray-100 rounded transition-colors"
+                  aria-label="Copy UPI ID"
+                  title="Copy UPI ID"
+                >
+                  <Copy class="w-4 h-4 text-primary hover:text-blue-500" />
+                </button>
+              </div>
+              <div class="flex items-center justify-center">
+                <div class="flex gap-4 items-center justify-center border border-gray-100 shadow rounded-lg w-fit  mt-2 p-3">
+                  <div class="flex items-center gap-2">
+                    <p class="text-lg">1234567890</p>
+                    <button
+                      on:click={() => copyToClipboard('1234567890', 'Phone number')}
+                      class="p-1 hover:bg-gray-100 rounded transition-colors"
+                      aria-label="Copy phone number 1234567890"
+                      title="Copy phone number"
+                    >
+                      <Copy class="w-4 h-4 text-primary hover:text-blue-500" />
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-2 ">
+                    <p class="text-lg">0987654321</p>
+                    <button
+                      on:click={() => copyToClipboard('0987654321', 'Phone number')}
+                      class="p-1 hover:bg-gray-100 rounded transition-colors"
+                      aria-label="Copy phone number 0987654321"
+                      title="Copy phone number"
+                    >
+                      <Copy class="w-4 h-4 text-primary hover:text-blue-500" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              </div>
+              
+              <Dialog.Footer class="pt-4 !flex  items-center justify-center !flex-col gap-3">
+                <Button 
+                  variant="outline" 
+                  onclick={() => isDialogOpen = false}
+                  class="w-full text-sm md:text-lg font-bold hover:text-white border-0 text-white  bg-custom-gradient hover:scale-105 transition-all duration-300"
+                >
+                  Upload Receipt
+                </Button>
+<div>
+  <p class="text-primary">Supported Size : 100kb</p>
+</div>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Root>
+      
         {/if}
       </div>
     </div>
