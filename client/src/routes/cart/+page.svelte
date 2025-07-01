@@ -16,6 +16,7 @@
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import { Button, buttonVariants } from "$lib/components/ui/button/index.js";
 	import { Copy } from "lucide-svelte";
+	import X from "@lucide/svelte/icons/x";
   // Interfaces remain unchanged
   interface ProductDetails {
     HSNCode: any;
@@ -119,6 +120,30 @@
     error: false
   };
 
+  // Add a new state variable for the confirmation dialog
+  let isConfirmationDialogOpen = false;
+
+  // ... (rest of the existing script code)
+
+  // Function to handle dialog close attempt
+  function handleDialogCloseAttempt() {
+    isConfirmationDialogOpen = true; // Open confirmation dialog instead of closing
+  }
+
+  // Function to confirm cancellation
+  function confirmCancel() {
+    isConfirmationDialogOpen = false;
+    isDialogOpen = false; // Close the main dialog after confirmation
+  }
+
+  // Function to cancel the confirmation (keep dialog open)
+  function cancelConfirmation() {
+    isConfirmationDialogOpen = false; // Close confirmation dialog, keep main dialog open
+  }
+  let selectedFileName = '';
+  let selectedFileName = '';
+  let isUploading = false;
+  let selectedFile: File | null = null;
   // Computed properties
   $: isLoggedIn = $writableGlobalStore.isLogedIn;
   $: cartData = $cartQuery.data;
@@ -502,7 +527,7 @@ validateStock();
               addressId: primaryAddress._id,
               razorPayResponse,
             });
-          } catch (error) {
+          } catch (error:any) {
             console.error('Order placement error:', error);
             toast.error(error.message || 'Failed to place order after payment');
             isPaying = false;
@@ -514,13 +539,85 @@ validateStock();
           isPaying = false;
         }
       });
-    } catch (error) {
+    } catch (error:any) {
       console.error('Payment error:', error);
       toast.error(error.message || 'Failed to process payment');
       isPaying = false;
     }
   }
 
+  const uploadReceiptMutation = createMutation({
+    mutationFn: async (file: File) => {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token found');
+
+      // Validate file
+      const maxSize = 100 * 1024; // 100KB in bytes
+      if (file.size > maxSize) {
+        throw new Error('File size exceeds 100KB limit');
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error('Invalid file type. Only JPEG, PNG, and PDF are allowed');
+      }
+
+      const formData = new FormData();
+      formData.append('receipt', file);
+      formData.append('cartId', cartData?.cart?._id || '');
+
+      try {
+        const response = await _axios.post('/orders/upload-receipt', formData, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+
+        if (!response.data.status) throw new Error(response.data.message);
+        return response.data;
+      } catch (error: any) {
+        throw new Error(error.response?.data?.message || 'Failed to upload receipt');
+      }
+    },
+    onSuccess: () => {
+      toast.success('Receipt uploaded successfully!');
+      isDialogOpen = false;
+      selectedFileName = '';
+      selectedFile = null;
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to upload receipt');
+    },
+    onSettled: () => {
+      isUploading = false;
+    }
+  });
+
+  function handleFileChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      selectedFile = file;
+      selectedFileName = file.name;
+      
+      // Trigger upload immediately
+      if (file) {
+        isUploading = true;
+        $uploadReceiptMutation.mutate(file);
+      }
+    }
+  }
+
+  function triggerFileUpload(e: Event) {
+    e.preventDefault();
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  }
 
   function updateQuantity(productId: string, change: number, stock: number) {
     const item = cartItems.find((item) => item.productId._id === productId);
@@ -693,7 +790,7 @@ validateStock();
                 {/if}
               </div>
               <div class="item-details flex-1">
-                <p
+                <button
                   on:click={() => {
                     if(item.productId.stock!=0){
                       goto(`/Products/${item.productId._id}`)
@@ -702,7 +799,7 @@ validateStock();
                   class={`font-bold text-lg mb-0.5 ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C] hover:underline hover:text-[#01A0E2]'}`}
                 >
                   {item.productId.productName}
-                </p>
+                </button>
                 <p>
                   {#if item.productId?.discount}
                   <span
@@ -745,11 +842,11 @@ validateStock();
                 <p class="text-sm">
                   GST: {item.productId.gst}%
                 </p>
-                <p class="text-sm">
+                <!-- <p class="text-sm">
                   {#if item.productId.HSNCode}
                     HSNCode: {item.productId.HSNCode}
                   {/if}
-                </p>
+                </p> -->
               </div>
             </div>
             <div class={`item-total text-center font-semibold text-base ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C]'}`}>
@@ -1028,83 +1125,130 @@ validateStock();
             <span class="text-[#30363C] font-bold">Total Amount</span>
             <span class="text-gray-800">₹{totalPrice.toFixed(2)}</span>
           </div>
-          <Dialog.Root bind:open={isDialogOpen}>
-            <Dialog.Trigger class="bg-custom-gradient cursor-pointer w-full mt-2 rounded-lg text-white p-1 font-bold">
-         
-            {#if isPaying || $placeOrderMutation.isPending}
-              Processing...
-            {:else}
-              PAY NOW
-            {/if}
-
-            </Dialog.Trigger>
-            
-            <Dialog.Content class=" max-h-[90vh] bg-white border-0">
-              <Dialog.Header class="pb-4">
-               
-              </Dialog.Header>
-              
-              <div class="relative w-full rounded-lg overflow-hidden">
-                <p class="text-primary text-xl text-center">
-                  Make Payment Using
-                </p>
-                <p class="text-center">
-                  Scanner, Number & Bank account
-                </p>
-              <img src="/images/qr.jpeg" alt="">
-              <div class="flex items-center justify-center gap-2 mt-2">
-                <p class="text-lg">UPI ID: stains@okaxis</p>
-                <button
-                  on:click={() => copyToClipboard('stains@okaxis', 'UPI ID')}
-                  class="p-1 hover:bg-gray-100 rounded transition-colors"
-                  aria-label="Copy UPI ID"
-                  title="Copy UPI ID"
-                >
-                  <Copy class="w-4 h-4 text-primary hover:text-blue-500" />
-                </button>
-              </div>
-              <div class="flex items-center justify-center">
-                <div class="flex gap-4 items-center justify-center border border-gray-100 shadow rounded-lg w-fit  mt-2 p-3">
-                  <div class="flex items-center gap-2">
-                    <p class="text-lg">1234567890</p>
-                    <button
-                      on:click={() => copyToClipboard('1234567890', 'Phone number')}
-                      class="p-1 hover:bg-gray-100 rounded transition-colors"
-                      aria-label="Copy phone number 1234567890"
-                      title="Copy phone number"
-                    >
-                      <Copy class="w-4 h-4 text-primary hover:text-blue-500" />
-                    </button>
+          <div class="relative">
+            <!-- Payment Button -->
+            <div 
+              class="bg-custom-gradient cursor-pointer w-full mt-2 rounded-lg text-white p-1 font-bold text-center"
+              on:click={() => isDialogOpen = true}
+            >
+              {#if isPaying || $placeOrderMutation.isPending}
+                Processing...
+              {:else}
+                PAY NOW
+              {/if}
+            </div>
+          
+            <!-- Payment Content -->
+            {#if isDialogOpen}
+              <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div class="max-h-[90dvh] relative overflow-y-auto bg-white rounded-lg p-6 w-full max-w-md">
+                  <!-- Header -->
+                  <div  class=" z-30 sticky top-0 right-0 flex justify-end  w-full">
+<div  on:click={handleDialogCloseAttempt} class="bg-red-600 text-white p-1 rounded-lg">
+  <X />
+</div>
                   </div>
-                  <div class="flex items-center gap-2 ">
-                    <p class="text-lg">0987654321</p>
-                    <button
-                      on:click={() => copyToClipboard('0987654321', 'Phone number')}
-                      class="p-1 hover:bg-gray-100 rounded transition-colors"
-                      aria-label="Copy phone number 0987654321"
-                      title="Copy phone number"
+                  
+                  <!-- Payment Options -->
+                  <div class="relative w-full rounded-lg overflow-hidden">
+                    <p class="text-primary text-xl text-center">
+                      Make Payment Using
+                    </p>
+                    <p class="text-center">
+                      Scanner, Number & Bank account
+                    </p>
+                    <img src="/images/qr.jpeg" alt="">
+                    <div class="flex items-center justify-center gap-2 mt-2">
+                      <p class="text-lg">UPI ID: stains@okaxis</p>
+                      <button
+                        on:click={() => copyToClipboard('stains@okaxis', 'UPI ID')}
+                        class="p-1 hover:bg-gray-100 rounded transition-colors"
+                        aria-label="Copy UPI ID"
+                        title="Copy UPI ID"
+                      >
+                        <Copy class="w-4 h-4 text-primary hover:text-blue-500" />
+                      </button>
+                    </div>
+                    <div class="flex items-center justify-center">
+                      <div class="flex gap-4 items-center justify-center border border-gray-100 shadow rounded-lg w-fit mt-2 p-3">
+                        <div class="flex items-center gap-2">
+                          <p class="text-lg">1234567890</p>
+                          <button
+                            on:click={() => copyToClipboard('1234567890', 'Phone number')}
+                            class="p-1 hover:bg-gray-100 rounded transition-colors"
+                            aria-label="Copy phone number 1234567890"
+                            title="Copy phone number"
+                          >
+                            <Copy class="w-4 h-4 text-primary hover:text-blue-500" />
+                          </button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <p class="text-lg">0987654321</p>
+                          <button
+                            on:click={() => copyToClipboard('0987654321', 'Phone number')}
+                            class="p-1 hover:bg-gray-100 rounded transition-colors"
+                            aria-label="Copy phone number 0987654321"
+                            title="Copy phone number"
+                          >
+                            <Copy class="w-4 h-4 text-primary hover:text-blue-500" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Footer -->
+                  <div class="pt-4 flex items-center justify-center flex-col gap-3">
+                    <Button 
+                    onclick={(e)=>{triggerFileUpload(e)}}
+                      class="w-full text-sm md:text-lg font-bold hover:text-white border-0 scale-95 text-white bg-custom-gradient  transition-all duration-300"
                     >
-                      <Copy class="w-4 h-4 text-primary hover:text-blue-500" />
-                    </button>
+                      Upload Receipt
+                    </Button>
+                    <div>
+                      <p class="text-primary">Supported Size: 100kb</p>
+                    </div>
+                    <!-- <Button 
+                      on:click={handleDialogCloseAttempt}
+                      class="w-full text-sm md:text-lg font-bold hover:text-white border-0 text-white hover:bg-red-700 bg-red-500 hover:scale-105 transition-all duration-300"
+                    >
+                      Cancel Payment
+                    </Button> -->
                   </div>
                 </div>
               </div>
+            {/if}
+          
+            <!-- Confirmation Dialog -->
+            {#if isConfirmationDialogOpen}
+              <div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+                <div class="max-w-sm bg-white rounded-lg p-6">
+                  <!-- Header -->
+                  <div class="pb-4">
+                    <h2 class="text-lg font-bold">Confirm Cancellation</h2>
+                    <p>
+                      Are you sure you want to cancel the payment?
+                    </p>
+                  </div>
+                  <!-- Footer -->
+                  <div class="pt-4 flex items-center justify-center flex-row gap-3">
+                    <Button 
+                      onclick={confirmCancel}
+                      class="w-full text-sm font-bold border-0 hover:bg-red-600 text-white bg-red-600 hover:scale-105 transition-all duration-300"
+                    >
+                      Yes, Cancel
+                    </Button>
+                    <Button 
+                      onclick={cancelConfirmation}
+                      class="w-full text-sm font-bold border-0 hover:bg-primary text-white bg-custom-gradient hover:scale-105 transition-all duration-300"
+                    >
+                      No, Continue
+                    </Button>
+                  </div>
+                </div>
               </div>
-              
-              <Dialog.Footer class="pt-4 !flex  items-center justify-center !flex-col gap-3">
-                <Button 
-                  variant="outline" 
-                  onclick={() => isDialogOpen = false}
-                  class="w-full text-sm md:text-lg font-bold hover:text-white border-0 text-white  bg-custom-gradient hover:scale-105 transition-all duration-300"
-                >
-                  Upload Receipt
-                </Button>
-<div>
-  <p class="text-primary">Supported Size : 100kb</p>
-</div>
-              </Dialog.Footer>
-            </Dialog.Content>
-          </Dialog.Root>
+            {/if}
+          </div>
       
         {/if}
       </div>

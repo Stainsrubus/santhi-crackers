@@ -513,7 +513,7 @@ testUrls.forEach(url => {
                 </div>
                 <button
                 on:click|preventDefault={handleAddToCart}
-                class="flex-1 bg-custom-gradient !w-fit hover:shadow-lg text-white py-3 px-6 rounded-lg hover:scale-95 duration-500 transition-all flex items-center justify-center gap-2 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+                class=" bg-custom-gradient !w-fit hover:shadow-lg text-white py-3 px-6 rounded-lg hover:scale-95 duration-500 transition-all flex items-center justify-center gap-2 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
                 disabled={!$productQuery.data || $productQuery.data.stock === 0 || $addToCartMutation.isPending}
               >
                 {#if $addToCartMutation.isPending}
