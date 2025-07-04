@@ -68,7 +68,7 @@ interface Order {
   // deliveryAgent?: Types.ObjectId;
   // deliveryTime?: Date;
   // store?: Types.ObjectId;
-  deliverySeconds?: number;
+  // deliverySeconds?: number;
   distance: string;
   coupon?: Types.ObjectId;
   couponCode: string;

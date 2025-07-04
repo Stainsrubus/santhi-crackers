@@ -319,139 +319,68 @@ export const adminOrderController = new Elysia({
 
   .patch(
     "/update-status/:id",
-    async ({ params, body,set }) => {
+    async ({ params, body, set }) => {
+      const startTime = Date.now(); // Start time for logging
+  
       try {
         const { id } = params;
         const { status } = body;
-
+  
+        console.log(`Starting order status update for order ID: ${id}`);
+  
         const order = await OrderModel.findById(id);
         if (!order) {
+          console.log(`Order not found for ID: ${id}`);
+          set.status = 404;
           return { message: "Order not found", status: "error" };
         }
+  
         const user = await User.findById(order.user);
-
         if (!user) {
+          console.log(`User not found for ID: ${order.user}`);
+          set.status = 404;
           return { message: "User not found", status: "error" };
         }
-
-        if (status == "cancelled" || status == "rejected") {
-          let refundDetails = null;
-          if (order.paymentMethod === "Online" && order.razorPayId) {
-            try {
-              // Validate totalPrice
-              if (order.totalPrice <= 0) {
-                set.status = 400;
-                return {
-                  message: "Cannot refund order with zero or negative amount",
-                  status: false
-                };
-              }
-    
-              // Check if payment is captured
-              const paymentResponse = await axios.get(
-                `https://api.razorpay.com/v1/payments/${order.razorPayId}`,
-                {
-                  auth: {
-                    username: process.env.RAZORPAY_KEY_ID || 'YOUR_KEY_ID',
-                    password: process.env.RAZORPAY_KEY_SECRET || 'YOUR_KEY_SECRET',
-                  },
-                }
-              );
-    
-              const payment = paymentResponse.data;
-              if (payment.status !== 'captured') {
-                set.status = 400;
-                return {
-                  message: "Payment not captured yet, cannot process refund",
-                  status: false
-                };
-              }
-    
-              // Process refund
-              const refundResponse = await axios.post(
-                `https://api.razorpay.com/v1/payments/${order.razorPayId}/refund`,
-                {
-                  amount: Math.round(order.totalPrice * 100), // Convert to paise
-                  speed: "normal",
-                  notes: {
-                    reason: `Order ${order.orderId} cancelled by user ${user.username}`,
-                    cancelled_by: user._id.toString(),
-                  },
-                },
-                {
-                  auth: {
-                    username: process.env.RAZORPAY_KEY_ID || 'YOUR_KEY_ID',
-                    password: process.env.RAZORPAY_KEY_SECRET || 'YOUR_KEY_SECRET',
-                  },
-                }
-              );
-    
-              refundDetails = refundResponse.data;
-    
-              // Update order with refund details
-              order.refunded = true;
-              order.refundedAmount = order.totalPrice;
-              order.refundedAt = new Date();
-            } catch (refundError) {
-              console.error('Refund error:', refundError);
-              set.status = 500;
-              return {
-                message: "Failed to process refund",
-                status: false,
-                error: refundError instanceof Error ? refundError.message : "Unknown refund error",
-              };
-            }
-          }
-          for (const product of order.products) {
-            await Product.findByIdAndUpdate(
-              product.productId,
-              { $inc: { stock: product.quantity } },
-              { new: true }
-            );
-          }
-          await sendNotification(
-            user.fcmToken,
-            "Order Rejected",
-            "Your order " +
-              order.orderId +
-              " has been rejected. Contact support for assistance."
-          );
-        }
-
-        if (status == "picked") {
-          await sendNotification(
-            user.fcmToken,
-            "On the Way!",
-            "Your order " +
-              order.orderId +
-              "  is out for delivery. Track your order for updates."
-          );
-        }
-
-        if (status == "accepted") {
-    
-          order.preparedAt = new Date(Date.now());
-
-          await order.save();
-
-          await sendNotification(
-            user.fcmToken,
-            "Dispatching Your Order",
-            "Your order " +
-              order.orderId +
-              " is being dispatched. We’ll notify you once it's out for delivery."
-          );
-        }
-
+  
+        console.log(`Order and user fetched in ${Date.now() - startTime}ms`);
+  
+        // Update order status first
         order.status = status;
         await order.save();
-
+        console.log(`Order status updated and saved in ${Date.now() - startTime}ms`);
+  
+        // Send notification asynchronously, log error but don't block
+        if (status === "dispatched") {
+          sendNotification(
+            user.fcmToken,
+            "On the Way! In transit",
+            `Your order ${order.orderId} is dispatched. Track your order for updates.`
+          ).catch((notificationError) => {
+            console.error("Failed to send dispatched notification:", notificationError);
+          });
+          console.log(`Notification triggered for dispatched status in ${Date.now() - startTime}ms`);
+        }
+  
+        if (status === "accepted") {
+          sendNotification(
+            user.fcmToken,
+            "Your Order has been Accepted",
+            `Your order ${order.orderId} is being accepted. We’ll notify you once it's out for dispatch.`
+          ).catch((notificationError) => {
+            console.error("Failed to send accepted notification:", notificationError);
+          });
+          console.log(`Notification triggered for accepted status in ${Date.now() - startTime}ms`);
+        }
+  
+        set.status = 200;
         return {
           message: "Order status updated successfully",
           status: "success",
           order,
         };
       } catch (error) {
+        console.error("Error updating order status:", error);
+        set.status = 500;
         return {
           message: "Failed to update order status",
           status: "error",
@@ -477,7 +406,7 @@ export const adminOrderController = new Elysia({
           "pending",
           "accepted",
           "rejected",
-          "ready for delivery",
+          "dispatched",
           "cancelled",
           "delivered",
         ];
@@ -525,253 +454,253 @@ export const adminOrderController = new Elysia({
       },
     }
   )
-  .post(
-    "/updatequantity",
-    async ({ body, set, store }) => {
-      const { orderId, productId, quantity } = body;
+  // .post(
+  //   "/updatequantity",
+  //   async ({ body, set, store }) => {
+  //     const { orderId, productId, quantity } = body;
 
-      try {
-        if (quantity < 1) {
-          set.status = 400;
-          throw new Error("Invalid quantity");
-        }
+  //     try {
+  //       if (quantity < 1) {
+  //         set.status = 400;
+  //         throw new Error("Invalid quantity");
+  //       }
 
-        const order = await OrderModel.findById(orderId);
-        if (!order) {
-          set.status = 404;
-          throw new Error("Order not found");
-        }
+  //       const order = await OrderModel.findById(orderId);
+  //       if (!order) {
+  //         set.status = 404;
+  //         throw new Error("Order not found");
+  //       }
 
-        const productDoc = await Product.findById(productId);
-        if (!productDoc) {
-          set.status = 404;
-          throw new Error("Product not found");
-        }
+  //       const productDoc = await Product.findById(productId);
+  //       if (!productDoc) {
+  //         set.status = 404;
+  //         throw new Error("Product not found");
+  //       }
 
-        const productIndex = order.products.findIndex(
-          (p) => p.productId.toString() === productId
-        );
+  //       const productIndex = order.products.findIndex(
+  //         (p) => p.productId.toString() === productId
+  //       );
 
-        if (productIndex === -1) {
-          set.status = 404;
-          throw new Error("Product not found in order");
-        }
+  //       if (productIndex === -1) {
+  //         set.status = 404;
+  //         throw new Error("Product not found in order");
+  //       }
 
-        const existingProduct = order.products[productIndex];
-        if (!existingProduct) {
-          set.status = 404;
-          throw new Error("Product not found in order");
-        }
+  //       const existingProduct = order.products[productIndex];
+  //       if (!existingProduct) {
+  //         set.status = 404;
+  //         throw new Error("Product not found in order");
+  //       }
 
-        const dipsTotal =
-          existingProduct.dips?.reduce(
-            (sum, dip) => sum + dip.totalAmount,
-            0
-          ) || 0;
+  //       const dipsTotal =
+  //         existingProduct.dips?.reduce(
+  //           (sum, dip) => sum + dip.totalAmount,
+  //           0
+  //         ) || 0;
 
-        const productGstAmount = (productDoc.price * productDoc.gst) / 100;
-        const totalTax = productGstAmount * quantity;
+  //       const productGstAmount = (productDoc.price * productDoc.gst) / 100;
+  //       const totalTax = productGstAmount * quantity;
 
-        order.products[productIndex] = {
-          ...existingProduct,
-          quantity: quantity,
-          totalAmount: quantity * productDoc.price + dipsTotal,
-          productId: productDoc._id,
-          price: productDoc.price,
-          name: productDoc.productName,
-          dips: existingProduct.dips || [],
-          suggestions: existingProduct.suggestions,
-          customSuggestion: existingProduct.customSuggestion,
-        };
+  //       order.products[productIndex] = {
+  //         ...existingProduct,
+  //         quantity: quantity,
+  //         totalAmount: quantity * productDoc.price + dipsTotal,
+  //         productId: productDoc._id,
+  //         price: productDoc.price,
+  //         name: productDoc.productName,
+  //         dips: existingProduct.dips || [],
+  //         suggestions: existingProduct.suggestions,
+  //         customSuggestion: existingProduct.customSuggestion,
+  //       };
 
-        const subtotal = order.products.reduce(
-          (sum, product) => sum + product.totalAmount,
-          0
-        );
-        const tax = totalTax;
-        const totalPrice = subtotal + tax;
+  //       const subtotal = order.products.reduce(
+  //         (sum, product) => sum + product.totalAmount,
+  //         0
+  //       );
+  //       const tax = totalTax;
+  //       const totalPrice = subtotal + tax;
 
-        const updatedOrder = await OrderModel.findOneAndUpdate(
-          { _id: order._id },
-          {
-            $set: {
-              products: order.products,
-              subtotal,
-              tax: Number(tax.toFixed(2)),
-              totalPrice,
-              lastUpdated: new Date(),
-            },
-          },
-          { new: true }
-        );
+  //       const updatedOrder = await OrderModel.findOneAndUpdate(
+  //         { _id: order._id },
+  //         {
+  //           $set: {
+  //             products: order.products,
+  //             subtotal,
+  //             tax: Number(tax.toFixed(2)),
+  //             totalPrice,
+  //             lastUpdated: new Date(),
+  //           },
+  //         },
+  //         { new: true }
+  //       );
 
-        return {
-          message: "Order updated successfully",
-          status: true,
-          order: updatedOrder,
-        };
-      } catch (error) {
-        console.error(error);
-        set.status = set.status || 400;
-        return {
-          message: "Failed to update order",
-          status: false,
-          error: error instanceof Error ? error.message : "Unknown error",
-        };
-      }
-    },
-    {
-      detail: {
-        summary: "Update product quantity in order",
-        description: "Update the quantity of an existing product in an order",
-      },
-      body: t.Object({
-        orderId: t.String({
-          pattern: "^[a-fA-F0-9]{24}$",
-        }),
-        productId: t.String({
-          pattern: "^[a-fA-F0-9]{24}$",
-        }),
-        quantity: t.Number({
-          minimum: 1,
-        }),
-      }),
-    }
-  )
-  .post(
-    "/updatequantities",
-    async ({ body, set, store }) => {
-      const { orderId, products } = body;
+  //       return {
+  //         message: "Order updated successfully",
+  //         status: true,
+  //         order: updatedOrder,
+  //       };
+  //     } catch (error) {
+  //       console.error(error);
+  //       set.status = set.status || 400;
+  //       return {
+  //         message: "Failed to update order",
+  //         status: false,
+  //         error: error instanceof Error ? error.message : "Unknown error",
+  //       };
+  //     }
+  //   },
+  //   {
+  //     detail: {
+  //       summary: "Update product quantity in order",
+  //       description: "Update the quantity of an existing product in an order",
+  //     },
+  //     body: t.Object({
+  //       orderId: t.String({
+  //         pattern: "^[a-fA-F0-9]{24}$",
+  //       }),
+  //       productId: t.String({
+  //         pattern: "^[a-fA-F0-9]{24}$",
+  //       }),
+  //       quantity: t.Number({
+  //         minimum: 1,
+  //       }),
+  //     }),
+  //   }
+  // )
+  // .post(
+  //   "/updatequantities",
+  //   async ({ body, set, store }) => {
+  //     const { orderId, products } = body;
 
-      try {
-        const order = await OrderModel.findById(orderId);
-        if (!order) {
-          set.status = 404;
-          throw new Error("Order not found");
-        }
+  //     try {
+  //       const order = await OrderModel.findById(orderId);
+  //       if (!order) {
+  //         set.status = 404;
+  //         throw new Error("Order not found");
+  //       }
 
-        for (const updateItem of products) {
-          const { productId, quantity } = updateItem;
+  //       for (const updateItem of products) {
+  //         const { productId, quantity } = updateItem;
 
-          if (quantity < 1) {
-            set.status = 400;
-            throw new Error(`Invalid quantity for product ${productId}`);
-          }
+  //         if (quantity < 1) {
+  //           set.status = 400;
+  //           throw new Error(`Invalid quantity for product ${productId}`);
+  //         }
 
-          const productDoc = await Product.findById(productId);
-          if (!productDoc) {
-            set.status = 404;
-            throw new Error(`Product not found: ${productId}`);
-          }
+  //         const productDoc = await Product.findById(productId);
+  //         if (!productDoc) {
+  //           set.status = 404;
+  //           throw new Error(`Product not found: ${productId}`);
+  //         }
 
-          const productIndex = order.products.findIndex(
-            (p) => p.productId.toString() === productId
-          );
+  //         const productIndex = order.products.findIndex(
+  //           (p) => p.productId.toString() === productId
+  //         );
 
-          if (productIndex === -1) {
-            set.status = 404;
-            throw new Error(`Product not found in order: ${productId}`);
-          }
+  //         if (productIndex === -1) {
+  //           set.status = 404;
+  //           throw new Error(`Product not found in order: ${productId}`);
+  //         }
 
-          const existingProduct = order.products[productIndex];
-          if (!existingProduct) {
-            set.status = 404;
-            throw new Error(`Product not found in order: ${productId}`);
-          }
+  //         const existingProduct = order.products[productIndex];
+  //         if (!existingProduct) {
+  //           set.status = 404;
+  //           throw new Error(`Product not found in order: ${productId}`);
+  //         }
 
-          const dipsTotal =
-            existingProduct.dips?.reduce(
-              (sum, dip) => sum + dip.totalAmount,
-              0
-            ) || 0;
+  //         const dipsTotal =
+  //           existingProduct.dips?.reduce(
+  //             (sum, dip) => sum + dip.totalAmount,
+  //             0
+  //           ) || 0;
 
-          const productGstAmount = (productDoc.price * productDoc.gst) / 100;
-          const totalTax = productGstAmount * quantity;
+  //         const productGstAmount = (productDoc.price * productDoc.gst) / 100;
+  //         const totalTax = productGstAmount * quantity;
 
-          order.products[productIndex] = {
-            ...existingProduct,
-            quantity: quantity,
-            totalAmount: quantity * productDoc.price + dipsTotal,
-            productId: productDoc._id,
-            price: productDoc.price,
-            name: productDoc.productName,
-            dips: existingProduct.dips || [],
-            suggestions: existingProduct.suggestions,
-            customSuggestion: existingProduct.customSuggestion,
-          };
-        }
+  //         order.products[productIndex] = {
+  //           ...existingProduct,
+  //           quantity: quantity,
+  //           totalAmount: quantity * productDoc.price + dipsTotal,
+  //           productId: productDoc._id,
+  //           price: productDoc.price,
+  //           name: productDoc.productName,
+  //           dips: existingProduct.dips || [],
+  //           suggestions: existingProduct.suggestions,
+  //           customSuggestion: existingProduct.customSuggestion,
+  //         };
+  //       }
 
-        const subtotal = order.products.reduce(
-          (sum, product) => sum + product.totalAmount,
-          0
-        );
+  //       const subtotal = order.products.reduce(
+  //         (sum, product) => sum + product.totalAmount,
+  //         0
+  //       );
 
-        let totalTax = 0;
-        for (const product of order.products) {
-          const productDoc = await Product.findById(product.productId);
-          if (!productDoc) {
-            set.status = 404;
-            throw new Error(`Product not found: ${product.productId}`);
-          }
+  //       let totalTax = 0;
+  //       for (const product of order.products) {
+  //         const productDoc = await Product.findById(product.productId);
+  //         if (!productDoc) {
+  //           set.status = 404;
+  //           throw new Error(`Product not found: ${product.productId}`);
+  //         }
 
-          const productGstAmount = (productDoc.price * productDoc.gst) / 100;
-          totalTax += productGstAmount * product.quantity;
-        }
+  //         const productGstAmount = (productDoc.price * productDoc.gst) / 100;
+  //         totalTax += productGstAmount * product.quantity;
+  //       }
 
-        const totalPrice = subtotal + totalTax;
+  //       const totalPrice = subtotal + totalTax;
 
-        const updatedOrder = await OrderModel.findOneAndUpdate(
-          { _id: order._id },
-          {
-            $set: {
-              products: order.products,
-              subtotal,
-              tax: Number(totalTax.toFixed(2)),
-              totalPrice,
-              lastUpdated: new Date(),
-            },
-          },
-          { new: true }
-        );
+  //       const updatedOrder = await OrderModel.findOneAndUpdate(
+  //         { _id: order._id },
+  //         {
+  //           $set: {
+  //             products: order.products,
+  //             subtotal,
+  //             tax: Number(totalTax.toFixed(2)),
+  //             totalPrice,
+  //             lastUpdated: new Date(),
+  //           },
+  //         },
+  //         { new: true }
+  //       );
 
-        return {
-          message: "Order updated successfully",
-          status: true,
-          order: updatedOrder,
-        };
-      } catch (error) {
-        console.error(error);
-        set.status = set.status || 400;
-        return {
-          message: "Failed to update order",
-          status: false,
-          error: error instanceof Error ? error.message : "Unknown error",
-        };
-      }
-    },
-    {
-      detail: {
-        summary: "Update multiple product quantities in order",
-        description:
-          "Update the quantities of multiple products in an order in a single request",
-      },
-      body: t.Object({
-        orderId: t.String({
-          pattern: "^[a-fA-F0-9]{24}$",
-        }),
-        products: t.Array(
-          t.Object({
-            productId: t.String({
-              pattern: "^[a-fA-F0-9]{24}$",
-            }),
-            quantity: t.Number({
-              minimum: 1,
-            }),
-          })
-        ),
-      }),
-    }
-  )
+  //       return {
+  //         message: "Order updated successfully",
+  //         status: true,
+  //         order: updatedOrder,
+  //       };
+  //     } catch (error) {
+  //       console.error(error);
+  //       set.status = set.status || 400;
+  //       return {
+  //         message: "Failed to update order",
+  //         status: false,
+  //         error: error instanceof Error ? error.message : "Unknown error",
+  //       };
+  //     }
+  //   },
+  //   {
+  //     detail: {
+  //       summary: "Update multiple product quantities in order",
+  //       description:
+  //         "Update the quantities of multiple products in an order in a single request",
+  //     },
+  //     body: t.Object({
+  //       orderId: t.String({
+  //         pattern: "^[a-fA-F0-9]{24}$",
+  //       }),
+  //       products: t.Array(
+  //         t.Object({
+  //           productId: t.String({
+  //             pattern: "^[a-fA-F0-9]{24}$",
+  //           }),
+  //           quantity: t.Number({
+  //             minimum: 1,
+  //           }),
+  //         })
+  //       ),
+  //     }),
+  //   }
+  // )
 
   .post(
     "/removeproduct",
@@ -859,4 +788,75 @@ export const adminOrderController = new Elysia({
         }),
       }),
     }
-  );
+  )
+  .patch(
+    "/verify-payment/:id",
+    async ({ params, body, set }) => {
+      try {
+        const { id } = params;
+        const { paymentStatus } = body;
+  
+        // Validate paymentStatus
+        const validStatuses = ["initiated", "completed", "failed"];
+        if (!validStatuses.includes(paymentStatus)) {
+          set.status = 400;
+          return {
+            message: "Invalid payment status",
+            status: "error",
+          };
+        }
+  
+        const order = await OrderModel.findById(id);
+        if (!order) {
+          set.status = 404;
+          return {
+            message: "Order not found",
+            status: "error",
+          };
+        }
+  
+        // Update payment status
+        order.paymentStatus = paymentStatus as "initiated" | "completed" | "failed";
+
+        if (paymentStatus === "completed") {
+          order.status = "accepted";
+          if (order.paymentImages && order.paymentImages.length > 0) {
+            order.paymentImages.forEach((image) => {
+              image.verified = true;
+            });
+          }
+        }
+        else if (paymentStatus === "failed") {
+          if (order.paymentImages && order.paymentImages.length > 0) {
+            order.paymentImages.forEach((image) => {
+              image.verified = false;
+            });
+          }
+        }
+  
+        await order.save();
+  
+        set.status = 200;
+        return {
+          message: "Payment status updated successfully",
+          status: "success",
+          order,
+        };
+      } catch (error) {
+        set.status = 500;
+        return {
+          message: "Failed to update payment status",
+          status: "error",
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+    {
+      params: t.Object({
+        id: t.String(),
+      }),
+      body: t.Object({
+        paymentStatus: t.String(),
+      }),
+    }
+  )  

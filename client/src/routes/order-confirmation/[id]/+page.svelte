@@ -19,8 +19,8 @@
         <h2 class="text-2xl text-[#191C1F] font-semibold mb-4">Your order is successfully placed</h2>
         <p class="text-gray-600 mb-6">Pellentesque sed lectus nec tortor tristique accumsan quis dictum risus. Donec voluptat molestie nulla non facilisis.</p>
         <div class="flex justify-center space-x-4">
-            <button on:click={() => goto('/')} class="px-4 py-2 bg-[#F3FBFF] text-[#01A0E2] border border-[#0EA5E9] rounded-lg">Go to home</button>
-            <button on:click={() => goto(`/order-history/${id}`)} class="px-4 py-2 bg-[#01A0E2] text-white rounded-lg">View Order</button>
+            <button on:click={() => goto('/')} class="px-4 py-2 bg-[#faf3ff] text-primary border border-primary rounded-lg">Go to home</button>
+            <button on:click={() => goto(`/order-history/${id}`)} class="px-4 py-2 bg-custom-gradient text-white rounded-lg">View Order</button>
         </div>
     </div>
 </div>

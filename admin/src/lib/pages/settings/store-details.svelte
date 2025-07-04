@@ -126,12 +126,12 @@
 
 	$effect(() => {
 		$form.storeName =
-			$query.data?.store?.storeName || 'Jeya Medical Enterprises';
+			$query.data?.store?.storeName || 'Store Enterprises';
 		$form.storeAddress =
 			$query.data?.store?.storeAddress ||
 			'No 111, xy Rd, y city,  600000';
 		$form.storePhone = $query.data?.store?.storePhone || '9994433764';
-		$form.storeEmail = $query.data?.store?.storeEmail || 'jeyamedicals@gmail';
+		$form.storeEmail = $query.data?.store?.storeEmail || 'test@gmail.com';
 		$form.storeDescription =
 			$query.data?.store?.storeDescription ||
 			`Description.................`;
@@ -140,7 +140,7 @@
 		$form.gstNumber = $query.data?.store?.gstNumber || '33AAABC1234D';
 		// $form.fssaiNumber = $query.data?.store?.fssaiNumber || '12345678901234';
 		$form.legalEntityName =
-			$query.data?.store?.legalEntityName || 'Jeya Medical Enterprises';
+			$query.data?.store?.legalEntityName || 'Store Enterprises';
 			$form.regulationNumber =
 			$query.data?.store?.regulationNumber || '03434992321';
 	});
@@ -179,8 +179,7 @@
 			<Input
 				id="storeName"
 				class="pr-10 mt-1"
-				disabled
-				placeholder="Jeya Medical Enterprises"
+				placeholder="Store Enterprises"
 				aria-invalid={$errors.storeName ? 'true' : undefined}
 				bind:value={$form.storeName}
 				{...$constraints.storeName}
@@ -276,7 +275,7 @@
 			<Input
 				id="legalEntityName"
 				class="pr-10 mt-1"
-				placeholder="Ex: JeyaMedical"
+				placeholder="Ex: Store name"
 				aria-invalid={$errors.legalEntityName ? 'true' : undefined}
 				bind:value={$form.legalEntityName}
 				{...$constraints.legalEntityName}

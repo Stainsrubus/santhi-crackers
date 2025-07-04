@@ -170,7 +170,7 @@
 							<Table.Cell>{formatDate(new Date(order?.createdAt).toISOString())}</Table.Cell>
 
 							<Table.Cell
-								>{(order?.totalPrice - order.couponDiscount + order.deliveryPrice).toFixed(2)} ₹</Table.Cell
+								>{(order?.totalPrice).toFixed(2)} ₹</Table.Cell
 							>
 							<Table.Cell class="capitalize">
 								<Badge class={setBadgeColor(order?.status)}>{order?.status}</Badge>

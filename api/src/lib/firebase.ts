@@ -1,11 +1,11 @@
 import admin from 'firebase-admin';
 import { readFileSync } from 'node:fs';
 
-// let cred = JSON.parse(readFileSync('credentials.json', 'utf-8'));
+let cred = JSON.parse(readFileSync('credentials.json', 'utf-8'));
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    // credential: admin.credential.cert(cred),
+    credential: admin.credential.cert(cred),
   });
 }
 
@@ -67,12 +67,12 @@ export async function sendNotification(
         notification: {
           title,
           body,
-          icon: 'https://ecommerce-76923.firebaseapp.com/favicon.png',
-          badge: 'https://ecommerce-76923.firebaseapp.com/favicon.png',
+          icon: 'https://firecrackers-4db7f.firebaseapp.com/favicon.png',
+          badge: 'https://firecrackers-4db7f.firebaseapp.com/favicon.png',
           requireInteraction: true,
         },
         fcm_options: {
-          link: 'https://ecommerce-76923.firebaseapp.com',
+          link: 'https://firecrackers-4db7f.firebaseapp.com',
         },
       },
     };

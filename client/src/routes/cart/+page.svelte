@@ -10,14 +10,13 @@
   import { goto } from "$app/navigation";
   import { writableGlobalStore } from "$lib/stores/global-store";
   import Footer from "$lib/components/footer.svelte";
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { loadRazorpay, initiatePayment } from '$lib/payment';
-  import Razorpay from "razorpay";
   import * as Dialog from '$lib/components/ui/dialog/index.js';
-  import { Button, buttonVariants } from "$lib/components/ui/button/index.js";
-	import { Copy } from "lucide-svelte";
-	import X from "@lucide/svelte/icons/x";
-  // Interfaces remain unchanged
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Copy } from "lucide-svelte";
+  import X from "@lucide/svelte/icons/x";
+
   interface ProductDetails {
     HSNCode: any;
     strikePrice: any;
@@ -119,30 +118,12 @@
     success: false,
     error: false
   };
-
-  // Add a new state variable for the confirmation dialog
   let isConfirmationDialogOpen = false;
-
-  // ... (rest of the existing script code)
-
-  // Function to handle dialog close attempt
-  function handleDialogCloseAttempt() {
-    isConfirmationDialogOpen = true; // Open confirmation dialog instead of closing
-  }
-
-  // Function to confirm cancellation
-  function confirmCancel() {
-    isConfirmationDialogOpen = false;
-    isDialogOpen = false; // Close the main dialog after confirmation
-  }
-
-  // Function to cancel the confirmation (keep dialog open)
-  function cancelConfirmation() {
-    isConfirmationDialogOpen = false; // Close confirmation dialog, keep main dialog open
-  }
-  let selectedFileName = '';
+  let isDialogOpen = false;
+  let previewImages: string[] = [];
+  let selectedFiles: File[] = [];
   let isUploading = false;
-  let selectedFile: File | null = null;
+
   // Computed properties
   $: isLoggedIn = $writableGlobalStore.isLogedIn;
   $: cartData = $cartQuery.data;
@@ -157,23 +138,18 @@
   $: platformFee = isCartLoading ? 0 : (cartData?.platformFee || 0);
   $: tax = isCartLoading ? 0 : (cartData?.cart?.tax || 0);
   $: totalPrice = isCartLoading ? 0 : (cartData?.cart?.totalPrice || 0);
-
-  // Calculate CGST and SGST directly from subtotal and tax rate
   $: taxRate = isCartLoading || totalAmount === 0 ? 0 : tax / totalAmount;
   $: cgst = isCartLoading ? 0 : totalAmount * (taxRate / 2);
   $: sgst = isCartLoading ? 0 : totalAmount * (taxRate / 2);
-
-  // Format CGST and SGST for display
   $: formattedCgst = isCartLoading ? '0.00' : Number(cgst.toFixed(4)).toString();
   $: formattedSgst = isCartLoading ? '0.00' : Number(sgst.toFixed(4)).toString();
-
-  // Show flat offer info only if exactly one product has flat offer
   $: showFlatOfferInfo = (() => {
     const flatOfferItems = cartItems.filter(item =>
       item.productId.flat && !item.productId.onMRP && !item.productId.discount
     );
     return flatOfferItems.length === 1;
   })();
+
   async function copyToClipboard(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text);
@@ -183,7 +159,69 @@
       toast.error(`Failed to copy ${label.toLowerCase()}`);
     }
   }
-let isDialogOpen=false
+
+  function handleDialogCloseAttempt() {
+    isConfirmationDialogOpen = true;
+  }
+
+  function confirmCancel() {
+    isConfirmationDialogOpen = false;
+    isDialogOpen = false;
+    clearPreviews();
+  }
+
+  function cancelConfirmation() {
+    isConfirmationDialogOpen = false;
+  }
+
+  function handleFileChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const files = Array.from(input.files);
+      
+      // Validate files
+      for (const file of files) {
+        if (!file.type.match(/image\/(jpeg|png)|application\/pdf/)) {
+          toast.error('Please upload only JPEG, PNG, or PDF files');
+          return;
+        }
+        if (file.size > 100 * 1024) {
+          toast.error('Each file should be less than 100KB');
+          return;
+        }
+      }
+
+      // Clear previous previews
+      clearPreviews();
+
+      // Create previews
+      selectedFiles = files;
+      previewImages = files.map(file => URL.createObjectURL(file));
+    }
+  }
+
+  function clearPreviews() {
+    previewImages.forEach(url => URL.revokeObjectURL(url));
+    previewImages = [];
+    selectedFiles = [];
+    const input = document.getElementById('file-upload') as HTMLInputElement;
+    if (input) input.value = '';
+  }
+
+  function removePreview(index: number) {
+    URL.revokeObjectURL(previewImages[index]);
+    previewImages = previewImages.filter((_, i) => i !== index);
+    selectedFiles = selectedFiles.filter((_, i) => i !== index);
+  }
+
+  function triggerFileUpload(e: Event) {
+    e.preventDefault();
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  }
+
   onMount(() => {
     showShimmer = true;
     $cartQuery.refetch();
@@ -191,6 +229,10 @@ let isDialogOpen=false
       showShimmer = false;
     }, 1000);
     return () => clearTimeout(timer);
+  });
+
+  onDestroy(() => {
+    clearPreviews();
   });
 
   function toggleCoupon() {
@@ -325,11 +367,12 @@ let isDialogOpen=false
   });
 
   const placeOrderMutation = createMutation({
-    mutationFn: async ({ addressId, razorPayResponse }: { addressId: string; razorPayResponse?: string }) => {
+    mutationFn: async ({ addressId, paymentImages }: { addressId: string; paymentImages?: File[] }) => {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
 
       if (!addressId) throw new Error('Please select a delivery address');
+      if (!paymentImages || paymentImages.length === 0) throw new Error('Please upload at least one payment image');
 
       const outOfStockItems = cartItems.filter(
         item => item?.productId && typeof item.productId.stock === 'number' && item.productId.stock <= 0
@@ -352,22 +395,22 @@ let isDialogOpen=false
         const itemDetails = insufficientStockItems.map(item =>
           `Only ${item.productId.stock} units of ${item.productId.productName} are available`
         ).join(', ');
-
         throw new Error(`Insufficient stock: ${itemDetails}. Please modify the quantities and try again.`);
       }
 
       try {
-        const response = await _axios.post(
-          '/orders/order',
-          {
-            addressId,
-            couponId: couponCode || undefined,
-            razorPayResponse
-          },
-          {
-            headers: { 'Authorization': `Bearer ${token}` }
+        const formData = new FormData();
+        formData.append('addressId', addressId);
+        paymentImages.forEach(file => {
+          formData.append('paymentImages', file);
+        });
+
+        const response = await _axios.post('/orders/order', formData, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
           }
-        );
+        });
 
         if (!response.data.status) throw new Error(response.data.message);
         return response.data;
@@ -380,10 +423,12 @@ let isDialogOpen=false
       queryClient.invalidateQueries({ queryKey: ['cart'] });
       queryClient.invalidateQueries({ queryKey: ['cartCount'] });
       toast.success('Order placed successfully!');
+      clearPreviews();
       goto(`/order-confirmation/${data.order._id}`);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(error.message || 'Failed to place order');
+      clearPreviews();
     }
   });
 
@@ -479,143 +524,12 @@ let isDialogOpen=false
     }
 
     try {
-validateStock();
-      
-
-      // Step 5: Load Razorpay SDK
-      const scriptLoaded = await loadRazorpay();
-      if (!scriptLoaded) {
-        throw new Error('Failed to load Razorpay SDK');
-      }
-
-      // Step 6: Create Razorpay order with the exact amount
-      const token = localStorage.getItem('token');
-      const orderResponse = await _axios.post(
-        '/orders/createpayorder', {},
-        {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }
-      );
-
-      if (!orderResponse.data.status) {
-        throw new Error(orderResponse.data.message || 'Failed to create Razorpay order');
-      }
-
-      const razorpayOrder = orderResponse.data.data;
-      if (!razorpayOrder.id || !razorpayOrder.amount || !razorpayOrder.currency) {
-        throw new Error('Invalid Razorpay order response');
-      }
-
-      await initiatePayment({
-        order: {
-          id: razorpayOrder.id,
-          amount: razorpayOrder.amount, // This should match paymentAmount
-          currency: 'INR'
-        },
-        customerName: primaryAddress.receiverName,
-        customerContact: primaryAddress.receiverMobile,
-        onSuccess: async (response) => {
-          try {
-            const razorPayResponse = JSON.stringify({
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature
-            });
-
-            await $placeOrderMutation.mutateAsync({
-              addressId: primaryAddress._id,
-              razorPayResponse,
-            });
-          } catch (error:any) {
-            console.error('Order placement error:', error);
-            toast.error(error.message || 'Failed to place order after payment');
-            isPaying = false;
-          }
-        },
-        onFailure: (error) => {
-          console.error('Payment failure:', error);
-          toast.error(error.description || 'Payment failed');
-          isPaying = false;
-        }
-      });
-    } catch (error:any) {
-      console.error('Payment error:', error);
-      toast.error(error.message || 'Failed to process payment');
+      await validateStock();
+      isDialogOpen = true;
+    } catch (error: any) {
+      console.error('Validation error:', error);
+      toast.error(error.message || 'Failed to validate cart');
       isPaying = false;
-    }
-  }
-
-  const uploadReceiptMutation = createMutation({
-    mutationFn: async (file: File) => {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No token found');
-
-      // Validate file
-      const maxSize = 100 * 1024; // 100KB in bytes
-      if (file.size > maxSize) {
-        throw new Error('File size exceeds 100KB limit');
-      }
-
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-      if (!allowedTypes.includes(file.type)) {
-        throw new Error('Invalid file type. Only JPEG, PNG, and PDF are allowed');
-      }
-
-      const formData = new FormData();
-      formData.append('receipt', file);
-      formData.append('cartId', cartData?.cart?._id || '');
-
-      try {
-        const response = await _axios.post('/orders/upload-receipt', formData, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-
-        if (!response.data.status) throw new Error(response.data.message);
-        return response.data;
-      } catch (error: any) {
-        throw new Error(error.response?.data?.message || 'Failed to upload receipt');
-      }
-    },
-    onSuccess: () => {
-      toast.success('Receipt uploaded successfully!');
-      isDialogOpen = false;
-      selectedFileName = '';
-      selectedFile = null;
-      queryClient.invalidateQueries({ queryKey: ['cart'] });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to upload receipt');
-    },
-    onSettled: () => {
-      isUploading = false;
-    }
-  });
-
-  function handleFileChange(event: Event) {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-      const file = input.files[0];
-      selectedFile = file;
-      selectedFileName = file.name;
-
-      // Trigger upload immediately
-      if (file) {
-        isUploading = true;
-        console.log(file)
-        // $uploadReceiptMutation.mutate(file);
-      }
-    }
-  }
-
-  function triggerFileUpload(e: Event) {
-    e.preventDefault();
-    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.click();
     }
   }
 
@@ -656,24 +570,22 @@ validateStock();
       state: { editAddressId: primaryAddress?._id }
     });
   }
+
+  function handleUploadAndPlaceOrder() {
+    if (selectedFiles.length === 0) {
+      toast.error('Please upload at least one payment receipt');
+      return;
+    }
+
+    isUploading = true;
+    $placeOrderMutation.mutate({
+      addressId: primaryAddress?._id || '',
+      paymentImages: selectedFiles
+    });
+  }
 </script>
 
-<!-- The rest of the Svelte component (HTML and styles) remains unchanged -->
-<!-- <section class="bg-[#F2F4F5] py-1 px-4 md:px-6 lg:px-8 mb-10">
-  <Breadcrumb.Root>
-    <Breadcrumb.List>
-      <Breadcrumb.Item>
-        <Breadcrumb.Link href="/" class="text-[#4F585E] hover:text-[#01A0E2] text-base">Home</Breadcrumb.Link>
-      </Breadcrumb.Item>
-      <Breadcrumb.Separator />
-      <Breadcrumb.Item>
-        <Breadcrumb.Link href="/cart" class="text-[#01A0E2] text-base">Cart</Breadcrumb.Link>
-      </Breadcrumb.Item>
-    </Breadcrumb.List>
-  </Breadcrumb.Root>
-</section> -->
-
-<div class="fixed bottom-4  right-4 z-50 max-w-md w-full space-y-2">
+<div class="fixed bottom-4 right-4 z-50 max-w-md w-full space-y-2">
   {#each notifications as notification (notification._id)}
     <div class="bg-white shadow-lg rounded-lg p-4 border border-gray-200 transition-all duration-300">
       <div class="flex justify-between items-start">
@@ -681,7 +593,7 @@ validateStock();
           <h3 class="font-semibold">{notification.title}</h3>
           <p class="text-sm text-gray-600">{notification.description}</p>
         </div>
-        <button on:click={() => closeNotification(notification._id)} class="text-gray-400 hover:text-gray-600">
+        <button onclick={() => closeNotification(notification._id)} class="text-gray-400 hover:text-gray-600">
           <Icon icon="mdi:close" class="w-5 h-5" />
         </button>
       </div>
@@ -696,13 +608,13 @@ validateStock();
             <span class="text-sm text-red-500">Failed, try again</span>
           {:else}
             <button
-              on:click={() => handleNotificationResponse(notification._id, 'yes')}
+              onclick={() => handleNotificationResponse(notification._id, 'yes')}
               class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
             >
               Yes
             </button>
             <button
-              on:click={() => handleNotificationResponse(notification._id, 'no')}
+              onclick={() => handleNotificationResponse(notification._id, 'no')}
               class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
             >
               No
@@ -735,7 +647,7 @@ validateStock();
         {/if}
       </div>
       <button
-        on:click={handleAddressClick}
+        onclick={handleAddressClick}
         class="h-fit bg-custom-gradient text-white px-3 py-1.5 rounded-md cursor-pointer lg:text-lg text-base whitespace-nowrap font-medium"
       >
         {primaryAddress && !showShimmer ? 'Edit address' : 'Add address'}
@@ -746,7 +658,7 @@ validateStock();
       <div class="lg:hidden rounded-lg p-1 text-sm text-yellow-600">
         <Icon icon="mdi:information" class="w-5 h-5 inline mr-1" />
         {cartItems.find(item => item.productId.flat)?.productId?.productName} has a flat {cartItems.find(item => item.productId.flat)?.productId.flat}% discount.
-        To avail Flat discount, Please add one more product from Flat Offer. <span class="text-blue-500 underline mx-1" on:click={()=>{goto("/offers")}}>Visit?</span>
+        To avail Flat discount, Please add one more product from Flat Offer. <span class="text-blue-500 underline mx-1" onclick={()=>{goto("/offers")}}>Visit?</span>
       </div>
     {/if}
 
@@ -791,7 +703,7 @@ validateStock();
               </div>
               <div class="item-details flex-1">
                 <button
-                  on:click={() => {
+                  onclick={() => {
                     if(item.productId.stock!=0){
                       goto(`/Products/${item.productId._id}`)
                     }
@@ -802,51 +714,21 @@ validateStock();
                 </button>
                 <p>
                   {#if item.productId?.discount}
-                  <span
-                  class={`${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#249B3E]'} line-through`}
-                >
-                  ₹{item.productId.price}
-                </span>
-                <span class='ml-2'>
-                  ₹{item.price}
-                </span>
+                    <span class={`${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#249B3E]'} line-through`}>
+                      ₹{item.productId.price}
+                    </span>
+                    <span class='ml-2'>
+                      ₹{item.price}
+                    </span>
                   {:else}
-                  <span
-                  class={`${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#249B3E]'}`}
-                >
-                  ₹{item.productId.price}
-                </span>
+                    <span class={`${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#249B3E]'}`}>
+                      ₹{item.productId.price}
+                    </span>
                   {/if}
-                
-                  <!-- {#if item?.selectedOffer}
-                    {#if item?.selectedOffer?.offerType === 'Discount'}
-                      <span class="text-sm">({item.selectedOffer?.discount}% OFF)</span>
-                    {:else if item.selectedOffer?.offerType === 'onMRP'}
-                      <div class="flex flex-col items-center">
-                        {#if item.selectedOffer?.onMRP?.subType === 'Need'}
-                          <span class="text-sm">{item.selectedOffer?.onMRP?.reductionValue} OFF</span>
-                          <span class="text-xs">{item.selectedOffer?.onMRP?.message}</span>
-                        {:else}
-                          <span class="text-sm">₹{item.selectedOffer?.onMRP.reductionValue} OFF (Complementary)</span>
-                        {/if}
-                      </div>
-                    {:else if item.selectedOffer?.offerType === 'Flat'}
-                      <div>
-                        <span class="text-sm">{item.selectedOffer.discount}% OFF</span>
-                      </div>
-                    {:else if item.selectedOffer?.offerType === 'Negotiate'}
-                      <span class="text-xs">(Negotiated Price)</span>
-                    {/if}
-                  {/if} -->
                 </p>
                 <p class="text-sm">
                   GST: {item.productId.gst}%
                 </p>
-                <!-- <p class="text-sm">
-                  {#if item.productId.HSNCode}
-                    HSNCode: {item.productId.HSNCode}
-                  {/if}
-                </p> -->
               </div>
             </div>
             <div class={`item-total text-center font-semibold text-base ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C]'}`}>
@@ -857,7 +739,7 @@ validateStock();
                 `}
               >
                 <button
-                  on:click={() => updateQuantity(item.productId._id, -1, item.productId.stock)}
+                  onclick={() => updateQuantity(item.productId._id, -1, item.productId.stock)}
                   class={`w-7.5 h-7.5 pl-2 border-gray-300 text-base flex items-center justify-center
                     ${item.quantity <= (item.selectedOffer?.offerType === 'Negotiate' && item.productId.negMOQ ? item.productId.negMOQ : 1) || item.productId.stock === 0 ? 'text-[#30363c6d] cursor-not-allowed' : 'text-primary cursor-pointer'}
                   `}
@@ -873,7 +755,7 @@ validateStock();
                   {item.quantity}
                 </span>
                 <button
-                  on:click={() => updateQuantity(item.productId._id, 1, item.productId.stock)}
+                  onclick={() => updateQuantity(item.productId._id, 1, item.productId.stock)}
                   class={`w-7.5 h-7.5 pr-2 border-gray-300 text-base flex items-center justify-center
                     ${item.productId.stock === 0 ? 'text-[#30363c6d] cursor-not-allowed' : 'text-primary cursor-pointer'}
                   `}
@@ -884,7 +766,7 @@ validateStock();
               </div>
             </div>
             <button
-              on:click={() => removeProduct(item.productId._id)}
+              onclick={() => removeProduct(item.productId._id)}
               class="text-red-500 cursor-pointer absolute top-0 right-0"
               disabled={$removeProductMutation.isPending}
             >
@@ -898,7 +780,6 @@ validateStock();
     <div class="cart-items hidden lg:block bg-white rounded-lg shadow-lg p-2 lg:w-[75%] h-fit border">
       <div class="cart-header flex items-center justify-between text-sm py-2 text-[#475156] border border-gray-300 bg-[#F2F4F5]">
         <span style="width: 30%; text-align: center;">PRODUCT</span>
-        <!-- <span style="width: 13%; text-align: center;">HSN CODE</span> -->
         <span style="width: 13%; text-align: center;">PRICE</span>
         <span style="width: 13%; text-align: center;">GST (%)</span>
         <span style="width: 13%; text-align: center;">OFFER</span>
@@ -947,7 +828,7 @@ validateStock();
               </div>
               <div class="item-details flex-1">
                 <p
-                  on:click={() => {
+                  onclick={() => {
                     if(item.productId.stock!=0){
                       goto(`/Products/${item.productId._id}`)
                     }
@@ -958,13 +839,9 @@ validateStock();
                 </p>
               </div>
             </div>
-            <!-- <div style="width: 13%;" class={`item-price text-center font-semibold text-base ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C]'}`}>
-              {item.productId.HSNCode || '-'}
-            </div> -->
             <div style="width: 13%;" class={`item-price text-center font-semibold text-base ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C]'}`}>
-
-                <span class="line-through pr-1">₹{item.productId.price}</span>
-     <span class='text-green-600'>         ₹{item.price.toFixed(2)} </span>
+              <span class="line-through pr-1">₹{item.productId.price}</span>
+              <span class='text-green-600'>₹{item.price.toFixed(2)}</span>
             </div>
             <div style="width: 13%;" class={`item-price text-center font-semibold text-base ${item.productId.stock===0?'text-[#30363c6d]':'text-[#30363C]'}`}>
               {item.productId.gst}%
@@ -973,8 +850,8 @@ validateStock();
               style="width: 13%;"
               class={`item-offer text-center font-semibold text-base ${item.productId.stock === 0 ? 'text-[#30363c6d]' : 'text-[#30363C]'}`}
             >
-           {#if (item.productId.discount)}
-{item.productId.discount}%
+              {#if (item.productId.discount)}
+                {item.productId.discount}%
               {:else}
                 <span class="text-gray-400">-</span>
               {/if}
@@ -989,7 +866,7 @@ validateStock();
               `}
             >
               <button
-                on:click={() => updateQuantity(item.productId._id, -1, item.productId.stock)}
+                onclick={() => updateQuantity(item.productId._id, -1, item.productId.stock)}
                 class={`w-7.5 h-7.5 pl-2 border-gray-300 text-base flex items-center justify-center
                   ${item.quantity <= (item.selectedOffer?.offerType === 'Negotiate' && item.productId.negMOQ ? item.productId.negMOQ : 1) || item.productId.stock === 0 ? 'text-[#30363c6d] cursor-not-allowed' : 'text-[#01A0E2] cursor-pointer'}
                 `}
@@ -1005,7 +882,7 @@ validateStock();
                 {item.quantity}
               </span>
               <button
-                on:click={() => updateQuantity(item.productId._id, 1, item.productId.stock)}
+                onclick={() => updateQuantity(item.productId._id, 1, item.productId.stock)}
                 class={`w-7.5 h-7.5 pr-2 border-gray-300 text-base flex items-center justify-center
                   ${item.productId.stock === 0 ? 'text-[#30363c6d] cursor-not-allowed' : 'text-primary cursor-pointer'}
                 `}
@@ -1016,7 +893,7 @@ validateStock();
             </div>
             <div style="width: 5%;" class="remove flex items-center justify-center">
               <button
-                on:click={() => removeProduct(item.productId._id)}
+                onclick={() => removeProduct(item.productId._id)}
                 class="text-red-500 cursor-pointer"
                 disabled={$removeProductMutation.isPending}
               >
@@ -1031,7 +908,7 @@ validateStock();
         <div class="rounded-lg p-1 text-sm text-yellow-600">
           <Icon icon="mdi:information" class="w-5 h-5 inline mr-1" />
           {cartItems.find(item => item.productId.flat)?.productId?.productName} has a flat {cartItems.find(item => item.productId.flat)?.productId.flat}% discount.
-          To avail Flat discount, Please add one more product from Flat Offer. <span class="text-primary underline mx-1" on:click={()=>{goto("/offers")}}>Visit?</span>
+          To avail Flat discount, Please add one more product from Flat Offer. <span class="text-primary underline mx-1" onclick={()=>{goto("/offers")}}>Visit?</span>
         </div>
       {/if}
     </div>
@@ -1055,7 +932,7 @@ validateStock();
           {/if}
         </div>
         <button
-          on:click={handleAddressClick}
+          onclick={handleAddressClick}
           class="h-fit bg-custom-gradient text-white px-4 py-2 rounded-md cursor-pointer text-lg whitespace-nowrap font-medium"
         >
           {primaryAddress && !showShimmer ? 'Edit address' : 'Add address'}
@@ -1072,7 +949,7 @@ validateStock();
             <span class="text-gray-800">₹{totalAmount.toFixed(2)}</span>
           </div>
           <div class="flex flex-col w-full items-end mb-2.5">
-            <p on:click={toggleCoupon} class="text-sm text-primary hover:underline cursor-pointer">{isCouponVisible ? "Cancel" : 'Apply Coupon?'}</p>
+            <p onclick={toggleCoupon} class="text-sm text-primary hover:underline cursor-pointer">{isCouponVisible ? "Cancel" : 'Apply Coupon?'}</p>
             {#if isCouponVisible}
               <div class="relative w-full">
                 <input
@@ -1085,7 +962,7 @@ validateStock();
                 {#if couponCode.trim().length > 0}
                   <button
                     disabled={couponDiscount > 0 || isApplying}
-                    on:click={() => {$cartQuery.refetch()}}
+                    onclick={() => {$cartQuery.refetch()}}
                     class="absolute right-1 top-1/2 transform -translate-y-1/2 bg-white text-primary text-sm px-2 py-0.5 rounded-md hover:bg-gray-100"
                   >
                     {#if isApplying}
@@ -1126,30 +1003,26 @@ validateStock();
             <span class="text-gray-800">₹{totalPrice.toFixed(2)}</span>
           </div>
           <div class="relative">
-            <!-- Payment Button -->
             <div 
               class="bg-custom-gradient cursor-pointer w-full mt-2 rounded-lg text-white p-1 font-bold text-center"
-              on:click={() => isDialogOpen = true}
+              onclick={handlePayNow}
             >
-              {#if isPaying || $placeOrderMutation.isPending}
+              {#if isPaying}
                 Processing...
               {:else}
                 PAY NOW
               {/if}
             </div>
           
-            <!-- Payment Content -->
             {#if isDialogOpen}
               <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                 <div class="max-h-[90dvh] relative overflow-y-auto bg-white rounded-lg p-6 w-full max-w-md">
-                  <!-- Header -->
-                  <div  class=" z-30 sticky top-0 right-0 flex justify-end  w-full">
-<div  on:click={handleDialogCloseAttempt} class="bg-red-600 text-white p-1 rounded-lg">
-  <X />
-</div>
+                  <div class="z-30 sticky top-0 right-0 flex justify-end w-full">
+                    <div onclick={handleDialogCloseAttempt} class="bg-red-600 text-white p-1 rounded-lg">
+                      <X />
+                    </div>
                   </div>
                   
-                  <!-- Payment Options -->
                   <div class="relative w-full rounded-lg overflow-hidden">
                     <p class="text-primary text-xl text-center">
                       Make Payment Using
@@ -1161,7 +1034,7 @@ validateStock();
                     <div class="flex items-center justify-center gap-2 mt-2">
                       <p class="text-lg">UPI ID: stains@okaxis</p>
                       <button
-                        on:click={() => copyToClipboard('stains@okaxis', 'UPI ID')}
+                        onclick={() => copyToClipboard('stains@okaxis', 'UPI ID')}
                         class="p-1 hover:bg-gray-100 rounded transition-colors"
                         aria-label="Copy UPI ID"
                         title="Copy UPI ID"
@@ -1174,7 +1047,7 @@ validateStock();
                         <div class="flex items-center gap-2">
                           <p class="text-lg">1234567890</p>
                           <button
-                            on:click={() => copyToClipboard('1234567890', 'Phone number')}
+                            onclick={() => copyToClipboard('1234567890', 'Phone number')}
                             class="p-1 hover:bg-gray-100 rounded transition-colors"
                             aria-label="Copy phone number 1234567890"
                             title="Copy phone number"
@@ -1185,7 +1058,7 @@ validateStock();
                         <div class="flex items-center gap-2">
                           <p class="text-lg">0987654321</p>
                           <button
-                            on:click={() => copyToClipboard('0987654321', 'Phone number')}
+                            onclick={() => copyToClipboard('0987654321', 'Phone number')}
                             class="p-1 hover:bg-gray-100 rounded transition-colors"
                             aria-label="Copy phone number 0987654321"
                             title="Copy phone number"
@@ -1197,51 +1070,79 @@ validateStock();
                     </div>
                   </div>
                   
-                  <!-- Footer -->
                   <div class="pt-4 flex items-center justify-center flex-col gap-3">
                     <input
-                    id="file-upload"
-                    type="file"
-                    accept="image/jpeg,image/png,application/pdf"
-                    on:change={handleFileChange}
-                    class="hidden"
-                  />
+                      id="file-upload"
+                      type="file"
+                      accept="image/jpeg,image/png,application/pdf"
+                      onchange={handleFileChange}
+                      class="hidden"
+                      multiple
+                    />
                     <Button 
-                    onclick={(e:any) => triggerFileUpload(e)}
-                      class="w-full text-sm md:text-lg font-bold hover:text-white border-0 scale-95 text-white bg-custom-gradient  transition-all duration-300"
+                      onclick={triggerFileUpload}
+                      class="w-full text-sm md:text-lg font-bold hover:text-white border-0 scale-95 text-white bg-custom-gradient transition-all duration-300"
+                      disabled={isUploading}
                     >
-                    {#if isUploading}
-                    Uploading...
-                  {:else}
-                    Upload Receipt
-                  {/if}
+                      {#if isUploading}
+                        Uploading...
+                      {:else}
+                        Choose Files
+                      {/if}
                     </Button>
+                    {#if previewImages.length > 0}
+                      <div class="flex flex-wrap gap-2 mt-2">
+                        {#each previewImages as image, index}
+                          <div class="relative">
+                            {#if image.includes('application/pdf')}
+                              <div class="w-16 h-16 bg-gray-100 flex items-center justify-center rounded border">
+                                <span class="text-xs">PDF</span>
+                              </div>
+                            {:else}
+                              <img 
+                                src={image} 
+                                alt="Preview" 
+                                class="w-16 h-16 object-cover rounded border"
+                              />
+                            {/if}
+                            <button
+                              class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+                              onclick={() => removePreview(index)}
+                            >
+                              <X class="w-3 h-3" />
+                            </button>
+                          </div>
+                        {/each}
+                      </div>
+                    {/if}
                     <div>
-                      <p class="text-primary">Supported Size: 100kb</p>
+                      <p class="text-primary">Supported Size: 100kb (JPEG, PNG, PDF)</p>
                     </div>
-                    <!-- <Button 
-                      on:click={handleDialogCloseAttempt}
-                      class="w-full text-sm md:text-lg font-bold hover:text-white border-0 text-white hover:bg-red-700 bg-red-500 hover:scale-105 transition-all duration-300"
+                    <Button 
+                      onclick={handleUploadAndPlaceOrder}
+                      class="w-full text-sm md:text-lg font-bold hover:text-white border-0 text-white bg-green-500 hover:bg-green-600 transition-all duration-300"
+                      disabled={isUploading || selectedFiles.length === 0}
                     >
-                      Cancel Payment
-                    </Button> -->
+                      {#if $placeOrderMutation.isPending}
+                        Placing Order...
+                      {:else}
+                        Place Order
+                      {/if}
+                    </Button>
                   </div>
                 </div>
               </div>
             {/if}
           
-            <!-- Confirmation Dialog -->
             {#if isConfirmationDialogOpen}
               <div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
                 <div class="max-w-sm bg-white rounded-lg p-6">
-                  <!-- Header -->
                   <div class="pb-4">
                     <h2 class="text-lg font-bold">Confirm Cancellation</h2>
                     <p>
                       Are you sure you want to cancel the payment?
                     </p>
                   </div>
-                  <!-- Footer -->
                   <div class="pt-4 flex items-center justify-center flex-row gap-3">
                     <Button 
                       onclick={confirmCancel}
@@ -1260,7 +1161,6 @@ validateStock();
               </div>
             {/if}
           </div>
-      
         {/if}
       </div>
     </div>
@@ -1269,7 +1169,7 @@ validateStock();
 {:else}
 <div class="container max-w-2xl my-20 py-20 rounded-lg shadow-lg flex-col gap-3 flex justify-center items-center">
   <p class="text-lg font-medium">Please login to access Cart</p>
-  <button on:click={() => goto('/login')} class="bg-custom-gradient hover:scale-105 rounded-lg px-4 text-lg text-white py-2">Login</button>
+  <button onclick={() => goto('/login')} class="bg-custom-gradient hover:scale-105 rounded-lg px-4 text-lg text-white py-2">Login</button>
 </div>
 {/if}
 

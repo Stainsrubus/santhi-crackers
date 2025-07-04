@@ -48,8 +48,8 @@ const userBaseController = new Elysia({
   .state("role", "")
   .onBeforeHandle(async ({ headers, set, store }) => {
     const token = headers["authorization"];
-
     try {
+
       const payload = await validateToken(token ?? "");
       store["id"] = payload.id;
       store["mobile"] = payload.mobile;

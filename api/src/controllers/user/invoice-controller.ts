@@ -12,7 +12,8 @@ export const invoiceController = new Elysia({
   detail: {
     tags: ["User - Invoice"],
   },
-}).post(
+})
+.post(
   "/generate",
   async ({ set, query, store }) => {
     if (!query.orderId) {
@@ -45,7 +46,7 @@ export const invoiceController = new Elysia({
       if (!order || !Estore) {
         set.status = 404;
         return {
-          message: "Order / Restaurant not found",
+          message: "Order  not found",
           ok: false,
         };
       }
@@ -64,6 +65,7 @@ export const invoiceController = new Elysia({
         .replace("{{order_id}}", order.orderId)
         .replace("{{invoice_id}}", order.invoiceId)
         .replace("{{gst}}", Estore.gstNumber)
+        .replace("{{store_name}}", Estore.storeName)
         .replace("{{legal_entity_name}}", Estore.legalEntityName)
         .replace("{{customer_name}}", order.user.username)
         .replace("{{customer_address}}", address)

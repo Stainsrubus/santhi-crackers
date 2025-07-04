@@ -129,10 +129,10 @@
 
   // Send OTP
   async function sendOTP() {
-    console.log('sendOTP function called'); // Debug log
+    // console.log('sendOTP function called'); // Debug log
     
     if (!validateMobile()) {
-      console.log('Mobile validation failed'); // Debug log
+      // console.log('Mobile validation failed'); // Debug log
       return;
     }
 

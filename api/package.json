@@ -23,6 +23,7 @@
     "@elysiajs/swagger": "^1.2.0",
     "@mapbox/polyline": "^1.2.1",
     "@rasla/logify": "^4.0.0",
+    "@types/puppeteer": "^7.0.4",
     "axios": "^1.7.9",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
@@ -34,7 +35,7 @@
     "nanoid": "^5.1.2",
     "paseto-ts": "^1.5.7",
     "pdfkit": "^0.16.0",
-    "puppeteer": "^24.9.0",
+    "puppeteer": "^24.11.2",
     "razorpay": "^2.9.6",
     "xlsx": "^0.18.5"
   }

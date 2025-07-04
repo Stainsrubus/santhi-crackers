@@ -24,10 +24,6 @@ const notificationSchema = new Schema(
       type: String,
       required: true,
     },
-    demand:{
-      type:Schema.Types.ObjectId,
-      ref:"Demand"
-    },
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",

@@ -16,6 +16,7 @@ import { Product } from "@/models/product";
 import  ComboOffer  from "@/models/combo-model";
 import { razor } from "@/lib/razorpay";
 import { NotificationModel } from "@/models/notification-model";
+import { deleteFile, saveFile } from "@/lib/file";
 
 export const userOrderController = new Elysia({
   prefix: "/orders",
@@ -31,38 +32,10 @@ export const userOrderController = new Elysia({
 .post(
   "/order",
   async ({ set, store, body }) => {
-    const userId = (store as StoreType)["id"];
-    const { addressId, couponId, razorPayResponse } = body;
+    const userId = (store as any)["id"];
+    const { addressId, couponId, paymentImages } = body;
 
     try {
-      // Parse Razorpay response
-      let razorPayRes;
-      try {
-        razorPayRes = razorPayResponse ? JSON.parse(razorPayResponse) : {};
-      } catch (error) {
-        set.status = 400;
-        return { message: "Invalid Razorpay response format", status: false };
-      }
-
-      const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = razorPayRes;
-
-      // Verify payment signature
-      if (razorpay_payment_id && razorpay_order_id && razorpay_signature) {
-        const crypto = require("crypto");
-        const generatedSignature = crypto
-          .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-          .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-          .digest("hex");
-
-        if (generatedSignature !== razorpay_signature) {
-          set.status = 400;
-          return { message: "Invalid payment signature", status: false };
-        }
-      } else if (razorPayResponse) {
-        set.status = 400;
-        return { message: "Incomplete Razorpay response", status: false };
-      }
-
       const cart = await CartModel.findOne({
         user: new mongoose.Types.ObjectId(userId),
         status: "active",
@@ -132,66 +105,42 @@ export const userOrderController = new Elysia({
       }
 
       let Estore = await StoreModel.findOne({});
-      let orderId = generateRandomString(6, "JME");
+      let orderId = generateRandomString(6, "SC");
 
       const orderProducts = cart.products.map((product) => ({
         productId: product.productId,
         quantity: product.quantity,
         totalAmount: product.totalAmount,
         price: product.price,
-        options: product.options,
-        selectedOffer: product.selectedOffer,
+        name: product.productId?.productName,
       }));
 
-      // Log all relevant data before order creation
-      console.log("=== Order Creation Data ===");
-      console.log("User ID:", userId);
-      console.log("Cart Details:", {
-        cartId: cart._id,
-        products: cart.products.map(p => ({
-          productId: p.productId,
-          price: p.price,
-          quantity: p.quantity,
-          totalAmount: p.totalAmount,
-          selectedOffer: p.selectedOffer,
-        })),
-        subtotal: cart.subtotal,
-        tax: cart.tax,
-        totalPrice: cart.totalPrice,
-        deliveryFee: cart.deliveryFee,
-        platformFee: cart.platformFee,
-        totalDistance: cart.totalDistance,
-        deliverySeconds: cart.deliverySeconds,
-      });
-      console.log("Address ID:", addressId);
-      console.log("Coupon ID:", couponId || "None");
-      console.log("Razorpay Response:", razorPayRes);
-      console.log("Order Products:", orderProducts);
-      console.log("Calculated Values Before Coupon:", {
-        subtotal: cart.subtotal,
-        tax: cart.tax,
-        totalPrice: cart.totalPrice,
-      });
+      const paymentImagesArray = [];
+      if (paymentImages && Array.isArray(paymentImages)) {
+        for (const image of paymentImages) {
+          const { filename, ok } = await saveFile(image, "payment-images");
+          if (!ok) {
+            set.status = 400;
+            return { message: `Unable to upload payment image: ${image.name}`, status: false };
+          }
+          paymentImagesArray.push({ image: filename, verified: false });
+        }
+      }
 
       const order = new OrderModel({
         user: cart.user,
-        store: Estore?._id,
         products: orderProducts,
         addressId: address._id,
+        paymentImages: paymentImagesArray,
         deliverySeconds: cart.deliverySeconds,
         distance: cart.totalDistance,
-        platformFee: cart.platformFee || 0,
-        deliveryPrice: cart.deliveryFee || 0,
         subtotal: cart.subtotal,
         tax: cart.tax,
         totalPrice: cart.totalPrice,
         status: "pending",
-        paymentMethod: razorPayResponse ? "Online" : "Cash on Delivery",
-        paymentStatus: razorPayResponse ? "completed" : "pending",
+        paymentMethod: "Online",
+        paymentStatus: "initiated",
         orderId,
-        razorPayResponse: razorPayResponse || "",
-        razorPayId: razorpay_payment_id || "",
-        razorOrderId: razorpay_order_id || "",
       });
 
       // Apply coupon if provided
@@ -203,49 +152,17 @@ export const userOrderController = new Elysia({
           order.coupon = coupon._id;
           order.couponCode = coupon.code;
           order.totalPrice = cart.totalPrice - discountAmount;
-          console.log("Coupon Applied:", {
-            couponId: coupon._id,
-            discount: coupon.discount,
-            discountAmount,
-            newTotalPrice: order.totalPrice,
-          });
         }
       }
 
-      // Log final order data
-      console.log("Final Order Data:", {
-        orderId: order.orderId,
-        subtotal: order.subtotal,
-        tax: order.tax,
-        totalPrice: order.totalPrice,
-        couponDiscount: order.couponDiscount || 0,
-        paymentMethod: order.paymentMethod,
-        paymentStatus: order.paymentStatus,
-      });
-
-      // Get map directions if not already available
-      if (!address.mapPloygonResponse) {
-        const response = await axios.get(
-          `https://maps.googleapis.com/maps/api/directions/json?origin=${Estore?.latitude},${Estore?.longitude}&destination=${address.latitude},${address.longitude}&key=${process.env.GOOGLE_MAPS_API_KEY}`
-        );
-        address.mapPloygonResponse = JSON.stringify(response.data);
-        order.mapPloygonResponse = JSON.stringify(response.data);
-        await address.save();
-      }
+      // Save the order
+      await order.save();
 
       // Step 2: Reduce stock for all valid products
       for (const { cartItem, product } of validProducts) {
         product.stock -= cartItem.quantity;
         await product.save();
       }
-
-      // Save the order
-      await order.save();
-      console.log("Order Saved:", order.toObject());
-
-      // Remove negotiation attempts for products in the cart
-      const productIds = cart.products.map((product) => product.productId._id.toString());
-      user.attempts = user.attempts.filter((attempt) => !productIds.includes(attempt.productId));
 
       // Clear the cart
       cart.products = [];
@@ -258,36 +175,10 @@ export const userOrderController = new Elysia({
       cart.totalDistance = 0;
       await cart.save();
 
-      // Save the updated user with attempts removed
-      await user.save();
-
-      // Broadcast and notify
-      broadcastMessage(
-        `New Order with Order ID: ${orderId} is placed by ${user.username}`
-      );
-      const notificationTitle = "Order Placed!";
-      const notificationContent = `Your order #${orderId} has been placed successfully.`;
-      await sendNotification(
-        user.fcmToken,
-        notificationTitle,
-        notificationContent
-      );
-
-      // Save notification to Notifications collection
-      const notification = new NotificationModel({
-        userId: new mongoose.Types.ObjectId(userId),
-        title: notificationTitle,
-        description: notificationContent,
-        type: "order",
-        orderId: order._id
-      });
-      await notification.save();
-
       return {
         message: "Order created successfully",
         status: true,
         order,
-        paymentRequired: !!razorPayResponse,
       };
     } catch (error) {
       set.status = 500;
@@ -305,11 +196,15 @@ export const userOrderController = new Elysia({
         pattern: `^[a-fA-F0-9]{24}$`,
       }),
       couponId: t.Optional(t.String()),
-      razorPayResponse: t.Optional(t.String()),
+      paymentImages: t.Files({
+        maxItems: 5,
+        maxSize: '100kb',
+        type: ['image/jpeg', 'image/png', 'application/pdf']
+      }),
     }),
     detail: {
-      summary: "Create order (with or without payment)",
-      description: "Create a new order from the user's cart with stock validation, supports both COD and online payment",
+      summary: "Create order with multiple payment image uploads",
+      description: "Create a new order from the user's cart with stock validation and multiple payment image uploads",
     },
   }
 )
@@ -930,6 +825,82 @@ export const userOrderController = new Elysia({
             description: "Internal server error during cancellation"
           }
         }
+      },
+    }
+  )
+  .patch(
+    "/:orderId/upload-payment-image",
+    async ({ params, body, set }) => {
+      try {
+        const { orderId } = params;
+        const { paymentImages } = body; // Changed from paymentImage to paymentImages
+  
+        // Validate order exists
+        const order = await OrderModel.findById(orderId);
+        if (!order) {
+          set.status = 404;
+          return { message: "Order not found", status: false };
+        }
+  
+        // Delete previous payment images from storage
+        if (order.paymentImages && order.paymentImages.length > 0) {
+          for (const image of order.paymentImages) {
+            try {
+              await deleteFile(image.image, "payment-images");
+            } catch (error) {
+              console.error("Failed to delete payment image:", image.image, error);
+            }
+          }
+        }
+  
+        // Handle multiple image uploads
+        const newPaymentImages = [];
+        if (paymentImages) {
+          // Handle single file (if not array)
+          const files = Array.isArray(paymentImages) ? paymentImages : [paymentImages];
+          
+          for (const file of files) {
+            const { filename, ok } = await saveFile(file, "payment-images");
+            if (ok) {
+              newPaymentImages.push({
+                image: filename,
+                verified: false
+              });
+            }
+          }
+        }
+  
+        // Update order with new payment images
+        order.paymentImages = newPaymentImages;
+        await order.save();
+  
+        return {
+          message: "Payment images updated successfully",
+          status: true,
+          order,
+        };
+      } catch (error) {
+        set.status = 500;
+        console.error("Replace Payment Images Error:", error);
+        return {
+          message: "Failed to update payment images",
+          status: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+    {
+      params: t.Object({
+        orderId: t.String({
+          pattern: `^[a-fA-F0-9]{24}$`,
+        }),
+      }),
+      body: t.Object({
+        paymentImages: t.Union([t.File(), t.Array(t.File())]), // Accepts single file or array
+      }),
+      detail: {
+        summary: "Update payment images for an order",
+        description: "Replaces all existing payment images with new uploaded images (single or multiple)",
       },
     }
   )
