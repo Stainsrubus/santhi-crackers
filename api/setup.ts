@@ -6,6 +6,8 @@ import dayjs from "dayjs";
 import { Elysia } from "elysia";
 import { connect } from "mongoose";
 import { baseRouter } from "./src/controllers";
+import { swagger } from "@elysiajs/swagger";
+import { sendNotification } from "@/lib/firebase";
 
 const app = new Elysia();
 
@@ -20,36 +22,36 @@ try {
   console.log(e);
 }
 
-// app.use(
-//   swagger({
-//     path: "/api/docs",
-//     exclude: ["/docs", "/docs/json"],
-//     theme: "dark",
-//     documentation: {
-//       servers: [
-//         {
-//           url: "/",
-//         },
-//       ],
-//       info: {
-//         title: "Jeyamedicals API",
-//         version: "1.0.0",
-//       },
-//       components: {
-//         securitySchemes: {
-//           bearerAuth: {
-//             scheme: "bearer",
-//             type: "http",
-//             bearerFormat: "JWT",
-//           },
-//         },
-//       },
-//     },
-//   })
-// );
+app.use(
+  swagger({
+    path: "/api/docs",
+    exclude: ["/docs", "/docs/json"],
+    theme: "dark",
+    documentation: {
+      servers: [
+        {
+          url: "/",
+        },
+      ],
+      info: {
+        title: "Ecommerce API",
+        version: "1.0.0",
+      },
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            scheme: "bearer",
+            type: "http",
+            bearerFormat: "JWT",
+          },
+        },
+      },
+    },
+  })
+);
 
 // @ts-ignore
-// app.use(logger({ console: true, skip: ["/docs", "/docs/json"] }));
+app.use(logger({ console: true, skip: ["/docs", "/docs/json"] }));
 
 app.use(baseRouter);
 
@@ -81,7 +83,11 @@ app.onError(({ code, error, set }) => {
     ok: false,
   };
 });
-
+await sendNotification(
+  "dlhjPmG5U7OpxgFwRFdtOv:APA91bGi066Nxx4WU9qh0L0I5BzkgGhbSwW56iWlrslREhDja6PHn1x9xO4xmDIfpGnlTE9J3NczupTjnjDsFupG2tqjD-BcqJ0tsPkRFU1f45SKTRUW7OM",
+  "Test Notification",
+  "This is a test notification"
+)
 // setInterval(() => {
 //   broadcastMessage("New Order Received");
 // }, 2000);

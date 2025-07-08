@@ -1,84 +1,55 @@
-// firebase-messaging-sw.js
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
+console.log('Service worker starting');
 
-// Initialize the Firebase app in the service worker
-firebase.initializeApp({
-  apiKey: "AIzaSyC5UifPendA71qUWm74AUxawNrn_nI7ukk",
-  authDomain: "firecrackers-4db7f.firebaseapp.com",
-  projectId: "firecrackers-4db7f",
-  storageBucket: "firecrackers-4db7f.firebasestorage.app",
-  messagingSenderId: "141382182409",
-  appId: "1:141382182409:web:26721a9a3d17374adf7ad8",
-  measurementId: "G-RC2SM7V95S"
-});
+const CACHE_NAME = 'firebase-messaging-v1';
 
-// Retrieve Firebase messaging
-const messaging = firebase.messaging();
-
-// Handle background messages
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message:', payload);
-  
-  const notificationTitle = payload.notification?.title || payload.data?.title || 'New Message';
-  const notificationOptions = {
-    body: payload.notification?.body || payload.data?.body || 'You have a new message',
-    icon: payload.notification?.icon || payload.data?.icon || '/favicon.png',
-    image: payload.notification?.image || payload.data?.image,
-    data: payload.data || {},
-    tag: payload.data?.id || `notification-${Date.now()}`,
-    requireInteraction: true,
-    actions: [
-      {
-        action: 'open',
-        title: 'Open',
-        icon: '/favicon.png'
-      },
-      {
-        action: 'close',
-        title: 'Close',
-        icon: '/favicon.png'
-      }
-    ]
-  };
-
-  return self.registration.showNotification(notificationTitle, notificationOptions);
-});
-
-// Handle notification clicks
-self.addEventListener('notificationclick', (event) => {
-  console.log('[firebase-messaging-sw.js] Notification click received:', event);
-  
-  event.notification.close();
-  
-  if (event.action === 'close') {
-    return;
-  }
-  
-  // Handle notification click - open the app
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    clients.openWindow(event.notification.data?.url || '/')
+    caches.open(CACHE_NAME)
+      .then(cache => console.log('Cache opened'))
+      .catch(err => console.error('Cache error:', err))
   );
 });
 
-// Handle push events (backup for FCM)
-self.addEventListener('push', (event) => {
-  console.log('[firebase-messaging-sw.js] Push received:', event);
-  
-  if (event.data) {
-    const payload = event.data.json();
-    console.log('Push payload:', payload);
-    
+// Load Firebase scripts
+try {
+  importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
+  importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js');
+
+  firebase.initializeApp({
+    apiKey: 'AIzaSyDxkpAyYjGS_jC3abTHDfdAVozeUR_MKiU',
+    authDomain: 'ecommerce-76923.firebaseapp.com',
+    projectId: 'ecommerce-76923',
+    storageBucket: 'ecommerce-76923.firebasestorage.app',
+    messagingSenderId: '1075564064831',
+    appId: '1:1075564064831:web:0e28c69c564ba6e9d4888a',
+    measurementId: 'G-ZSPBRZFZ6N'
+  });
+
+  const messaging = firebase.messaging();
+
+  messaging.onBackgroundMessage((payload) => {
+    console.log('[SW] Background message:', payload);
     const notificationTitle = payload.notification?.title || 'New Message';
     const notificationOptions = {
-      body: payload.notification?.body || 'You have a new message',
-      icon: payload.notification?.icon || '/favicon.png',
-      data: payload.data || {},
-      tag: payload.data?.id || `push-${Date.now()}`,
+      body: payload.notification?.body || '',
+      icon: '/favicon1.png',
+      data: payload.data || {}
     };
-    
+    return self.registration.showNotification(notificationTitle, notificationOptions);
+  });
+
+  self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const url = event.notification.data?.url || '/';
     event.waitUntil(
-      self.registration.showNotification(notificationTitle, notificationOptions)
+      clients.matchAll({type: 'window'})
+        .then(clients => {
+          const client = clients.find(c => c.url === url);
+          return client ? client.focus() : clients.openWindow(url);
+        })
     );
-  }
-});
+  });
+
+} catch (error) {
+  console.error('Service worker error:', error);
+}

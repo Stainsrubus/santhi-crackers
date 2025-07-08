@@ -39,6 +39,7 @@ const adminController = new Elysia({
 
     if (!pasetoToken) {
       set.status = 401;
+      console.log("Unauthorized1");
       return {
         message: "Unauthorized",
       };
@@ -46,6 +47,7 @@ const adminController = new Elysia({
 
     if (!pasetoToken.startsWith("v4.local.")) {
       set.status = 401;
+      console.log("Unauthorized2");
       return {
         message: "Unauthorized",
       };
@@ -55,6 +57,7 @@ const adminController = new Elysia({
 
     if (!payload) {
       set.status = 401;
+      console.log("Unauthorized3");
       return {
         message: "Unauthorized",
       };

@@ -87,6 +87,8 @@ const authController = new Elysia({
             true
           );
 
+          console.log(token);
+
           // const restaurent = await StoreModel.findOne();
 
           // const restaurentWithBase64 = {

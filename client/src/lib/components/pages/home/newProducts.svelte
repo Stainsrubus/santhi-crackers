@@ -45,12 +45,12 @@
         throw new Error(response.data.message || 'Failed to fetch products');
       }
 
-      console.log('API Response:', response.data.data);
+      // console.log('API Response:', response.data.data);
 
       const allProducts = response.data.data.map((product: any) => {
-        console.log('Raw product from API:', product);
-        console.log('Mapping product unit:', product.unit);
-        console.log('Unit type:', typeof product.unit);
+        // console.log('Raw product from API:', product);
+        // console.log('Mapping product unit:', product.unit);
+        // console.log('Unit type:', typeof product.unit);
         const mappedProduct = {
           id: product._id,
           name: product.productName,
@@ -65,11 +65,11 @@
           favorite: product.favorite,
           available: product.available,
         };
-        console.log('Mapped product unit:', mappedProduct.unit);
+        // console.log('Mapped product unit:', mappedProduct.unit);
         return mappedProduct;
       });
 
-      console.log('Mapped products:', allProducts);
+      // console.log('Mapped products:', allProducts);
       return allProducts;
     },
   });
@@ -79,13 +79,13 @@
   $: productsError = $productsQuery.error ? ($productsQuery.error as Error).message : null;
 
   // Debug reactive statement
-  $: {
-    console.log('Products in component:', products);
-    products.forEach((product, index) => {
-      console.log(`Product ${index} unit:`, product.unit);
-      console.log(`Product ${index} full object:`, product);
-    });
-  }
+  // $: {
+  //   console.log('Products in component:', products);
+  //   products.forEach((product, index) => {
+  //     console.log(`Product ${index} unit:`, product.unit);
+  //     console.log(`Product ${index} full object:`, product);
+  //   });
+  // }
 </script>
 
 <section class="pl-4 md:px-6 lg:px-8 py-10">
@@ -121,11 +121,7 @@
         <div class="flex md:gap-6 items-center flex-wrap gap-4 py-1 px-1 scrollbar-hide">
           {#each products as product (product.id)}
             <div class="flex-wrap">
-              {console.log('Passing to ProductCard:', {
-                id: product.id,
-                unit: product.unit,
-                name: product.name
-              })}
+           
               <ProductCard
                 id={product.id}
                 image={product.image[0]}

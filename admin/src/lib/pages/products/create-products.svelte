@@ -449,7 +449,9 @@ const createBrandMutation = createMutation({
 
   let formData = new FormData();
   formData.append('productName', $form.productName);
-  formData.append('ytLink', $form.ytLink);
+  if($form.ytLink){
+	formData.append('ytLink', $form.ytLink);
+  }
   formData.append('category', $form.category.split(' -&- ')[0]);
   formData.append('brand', $form.brand.split(' -&- ')[0]);
   ageGroups.forEach((ageGroup) => {

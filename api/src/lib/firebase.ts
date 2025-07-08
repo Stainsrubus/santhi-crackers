@@ -67,12 +67,12 @@ export async function sendNotification(
         notification: {
           title,
           body,
-          icon: 'https://firecrackers-4db7f.firebaseapp.com/favicon.png',
-          badge: 'https://firecrackers-4db7f.firebaseapp.com/favicon.png',
+          icon: 'https://ecommerce-76923.firebaseapp.com/favicon.png',
+          badge: 'https://ecommerce-76923.firebaseapp.com/favicon.png',
           requireInteraction: true,
         },
         fcm_options: {
-          link: 'https://firecrackers-4db7f.firebaseapp.com',
+          link: 'https://ecommerce-76923.firebaseapp.com',
         },
       },
     };

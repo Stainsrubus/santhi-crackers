@@ -32,22 +32,19 @@ export const productsController = new Elysia({
         discount,
         ageGroup,
         occations,
-        // strikePrice,
-        // HSNCode,
         active,
         images,
         productCode,
         ratings,
         topSeller,
         gst,
-        groups, 
-        // options, 
-        // negotiateLimit,
+        groups,
         specifications,
       } = body;
 
       const _unit = await UnitModel.findById(unit);
       if (!_unit) return { message: "Unit not found", status: false };
+
       const _category = await ProductCategory.findById(category);
       if (!_category) return { message: "Category not found", status: false };
 
@@ -57,6 +54,7 @@ export const productsController = new Elysia({
       const existing = await Product.findOne({
         $or: [{ productName }, { productCode }],
       });
+
       if (existing) {
         return { message: "Product already exists", status: false };
       }
@@ -67,41 +65,44 @@ export const productsController = new Elysia({
         if (ok) _images.push(filename);
       }
 
-      // let _options = JSON.parse(options);
-      let _specifications = JSON.parse(specifications); 
+      let _specifications = JSON.parse(specifications);
+
+      // Ensure groups, ageGroup, and occations are arrays
+      const _groups = Array.isArray(groups) ? groups : [groups].filter(Boolean);
+      const _ageGroup = Array.isArray(ageGroup) ? ageGroup : [ageGroup].filter(Boolean);
+      const _occations = Array.isArray(occations) ? occations : [occations].filter(Boolean);
+
       const product = await Product.create({
         productName,
         description,
         price: +price,
-        stock:+stock,
+        stock: +stock,
         unit: _unit._id,
         discount: +discount,
-        ageGroup,
-        ytLink,
-        occations,
-        // negotiateLimit:+negotiateLimit,
+        ageGroup: _ageGroup,
+        ytLink: ytLink || '', // Ensure ytLink is handled correctly
+        occations: _occations,
         images: _images,
         active,
-        // HSNCode:HSNCode,
-        // strikePrice:+strikePrice,
         category: _category._id,
-        brand:_brand._id,
+        brand: _brand._id,
         productCode: productCode.toUpperCase(),
         ratings: +ratings,
         topSeller: topSeller === "true",
         gst: +gst,
-             groups: groups || [], 
-        // options: _options, 
+        groups: _groups,
         specifications: _specifications,
       });
 
       await product.save();
-      if (groups && groups.length > 0) {
+
+      if (_groups && _groups.length > 0) {
         await Group.updateMany(
-          { _id: { $in: groups } },
+          { _id: { $in: _groups } },
           { $addToSet: { products: product._id } }
         );
       }
+
       return {
         message: "Product Created Successfully",
         data: { name: product.productName },
@@ -117,26 +118,22 @@ export const productsController = new Elysia({
       productName: t.String({ default: "Product", examples: ["baby pants"] }),
       category: t.String({}),
       unit: t.String({}),
-      brand:t.String({}),
-      ytLink:t.String(),
+      brand: t.String({}),
+      ytLink: t.Optional(t.String()),
       ratings: t.Number({ default: 5, examples: [5] }),
       images: t.Files(),
       productCode: t.String({ default: "123456", examples: ["123456"] }),
       price: t.String({ default: 100 }),
       discount: t.String({ default: 10 }),
-      occations: t.Array(t.String()),
-ageGroup: t.Array(t.String()),
-      // HSNCode:t.String(),
-      // negotiateLimit:t.String({default:0}),
-      // strikePrice: t.String({ default: 150 }),
+      occations: t.Union([t.Array(t.String()), t.String()]),
+      ageGroup: t.Union([t.Array(t.String()), t.String()]),
       description: t.String({ default: "Product" }),
       topSeller: t.String({ default: false }),
-      stock:t.String({default:0}),
+      stock: t.String({ default: 0 }),
       gst: t.String({ default: 0 }),
       active: t.Boolean({ default: true }),
-      // options: t.String({ examples: ['[{"title":"Size","values":["S","M","L"]}]'] }),
       specifications: t.String(),
-      groups: t.Array(t.String()), 
+      groups: t.Union([t.Array(t.String()), t.String()]),
     }),
     detail: { summary: "Create a new product" },
   }

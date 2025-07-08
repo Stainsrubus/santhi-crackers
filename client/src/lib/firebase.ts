@@ -4,13 +4,13 @@ import { _axios } from '$lib/_axios';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC5UifPendA71qUWm74AUxawNrn_nI7ukk",
-  authDomain: "firecrackers-4db7f.firebaseapp.com",
-  projectId: "firecrackers-4db7f",
-  storageBucket: "firecrackers-4db7f.firebasestorage.app",
-  messagingSenderId: "141382182409",
-  appId: "1:141382182409:web:26721a9a3d17374adf7ad8",
-  measurementId: "G-RC2SM7V95S"
+  apiKey: 'AIzaSyDxkpAyYjGS_jC3abTHDfdAVozeUR_MKiU',
+  authDomain: 'ecommerce-76923.firebaseapp.com',
+  projectId: 'ecommerce-76923',
+  storageBucket: 'ecommerce-76923.firebasestorage.app',
+  messagingSenderId: '1075564064831',
+  appId: '1:1075564064831:web:0e28c69c564ba6e9d4888a',
+  measurementId: 'G-ZSPBRZFZ6N',
 };
 
 const app = initializeApp(firebaseConfig);
@@ -20,6 +20,26 @@ const db = getFirestore(app);
 // Store processed notification IDs in memory
 const processedNotifications = new Set();
 
+// Safari-specific function to request notification permission
+async function requestSafariNotificationPermission() {
+  if (typeof window !== 'undefined' && (window as any).safari) {
+    try {
+      console.log('Requesting Safari notification permission');
+      const permission = await Notification.requestPermission();
+      console.log('Safari permission result:', permission);
+      if (permission !== 'granted') {
+        console.warn('Notification permission denied in Safari');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error requesting notification permission in Safari:', error);
+      return false;
+    }
+  }
+  return true;
+}
+
 export const requestForToken = async () => {
   console.log('requestForToken called');
   try {
@@ -28,43 +48,31 @@ export const requestForToken = async () => {
       return null;
     }
 
-    // Check if service worker is supported
-    if (!('serviceWorker' in navigator)) {
-      console.warn('Service workers are not supported');
-      return null;
-    }
+    // Request permission with Safari-specific handling
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    let permissionGranted = false;
 
-    // Request notification permission first
-    console.log('Current permission:', Notification.permission);
-    
-    let permission = Notification.permission;
-    if (permission === 'default') {
-      console.log('Requesting notification permission');
-      permission = await Notification.requestPermission();
+    if (isSafari) {
+      permissionGranted = await requestSafariNotificationPermission();
+    } else {
+      console.log('Requesting notification permission (non-Safari)');
+      const permission = await Notification.requestPermission();
       console.log('Permission result:', permission);
+      permissionGranted = permission === 'granted';
     }
 
-    if (permission !== 'granted') {
+    if (!permissionGranted) {
       console.warn('Notification permission denied');
       return null;
     }
 
     // Register service worker
     console.log('Registering service worker');
-    let registration;
-    try {
-      registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-        scope: '/',
-      });
-      console.log('Service Worker registered:', registration);
-      
-      // Wait for service worker to be ready
-      await navigator.serviceWorker.ready;
-      console.log('Service Worker is ready');
-    } catch (swError) {
-      console.error('Service Worker registration failed:', swError);
-      return null;
-    }
+    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+      scope: '/',
+      // Removed type: 'module' as it's not strictly required for Safari web push
+    });
+    console.log('Service Worker registered:', registration);
 
     // Get FCM token
     console.log('Getting FCM token');
@@ -74,7 +82,7 @@ export const requestForToken = async () => {
     });
 
     if (currentToken) {
-      console.log('FCM token obtained:', currentToken);
+      console.log('FCM token:', currentToken);
 
       // Send token to backend
       const token = localStorage.getItem('token');
@@ -89,14 +97,14 @@ export const requestForToken = async () => {
             }
           );
           console.log('FCM token updated successfully:', res.data);
-          return { token: currentToken, response: res };
+          return res;
         } catch (error) {
           console.error('Error updating FCM token:', error);
-          return { token: currentToken, error };
+          return currentToken; // Return token even if backend fails
         }
       } else {
         console.warn('No auth token available to update FCM token');
-        return { token: currentToken };
+        return currentToken;
       }
     } else {
       console.warn('No registration token available');
@@ -105,18 +113,15 @@ export const requestForToken = async () => {
   } catch (error) {
     console.error('Error in requestForToken:', error);
     if (error.code === 'messaging/unsupported-browser') {
-      console.error('Browser may not support FCM');
-    } else if (error.code === 'messaging/permission-blocked') {
-      console.error('Notification permission blocked');
+      console.error('Safari may require additional configuration for FCM');
     }
     return null;
   }
 };
 
-// Handle foreground messages
+// Only handle foreground messages
 export const onMessageListener = () => {
-  console.log('Setting up foreground message listener');
-  
+  console.log('message listening....')
   onMessage(messaging, (payload) => {
     console.log('Foreground message received:', payload);
 
@@ -132,47 +137,33 @@ export const onMessageListener = () => {
     // Mark this notification as processed
     processedNotifications.add(messageId);
 
-    // Show notification if app is in foreground and permission is granted
-    if (document.visibilityState === 'visible' && Notification.permission === 'granted') {
-      const notification = new Notification(payload.notification?.title || 'New Message', {
-        body: payload.notification?.body || 'You have a new message',
-        icon: payload.notification?.icon || '/favicon.png',
-        // image: payload.notification?.image,
-        data: payload.data || {},
-        tag: messageId,
-        requireInteraction: true, // Keep notification until user interacts
-      });
-
-      // Handle notification click
-      notification.onclick = (event) => {
-        console.log('Notification clicked:', event);
-        event.preventDefault();
-        notification.close();
-        
-        // Handle the click action (e.g., open a specific page)
-        if (payload.data?.url) {
-          window.open(payload.data.url, '_blank');
-        } else {
-          window.focus();
-        }
-      };
-
-      // Auto-close after 5 seconds
-      setTimeout(() => {
-        notification.close();
-      }, 5000);
+    // Only show notification if app is in foreground
+    if (document.visibilityState === 'visible') {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(payload.notification?.title || 'Notification', {
+          body: payload.notification?.body,
+          icon: '/favicon.png',
+          data: payload.data || {},
+          tag: messageId,
+        });
+      }
     }
   });
 };
 
-// Initialize messaging when the module loads
-if (typeof window !== 'undefined') {
-  // Set up the message listener immediately
-  onMessageListener();
-  
-  // Handle page visibility changes
-  document.addEventListener('visibilitychange', () => {
-    console.log('Page visibility changed:', document.visibilityState);
+// Safari-specific service worker registration check
+if (typeof window !== 'undefined' && (window as any).safari) {
+  window.addEventListener('load', () => {
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    console.log('Active SW registrations:', registrations);
+    if (registrations.length === 0) {
+      navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then(reg => console.log('SW registered:', reg))
+        .catch(err => console.error('SW registration failed:', err));
+    }
+  });
+}
   });
 }
 

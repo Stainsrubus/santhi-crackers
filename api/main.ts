@@ -42,7 +42,6 @@ app.ws("/api/admin/ws", {
   },
 });
 
-// await sendNotification('emy17ATczeCB1f6gz5B6re:APA91bF6FUEr8AH0BdDNvPhLYYYNJ5kUNXNo7kmUyN_0EtjmFrzrs5fGp9o09iwrtix1kHYA4V_fxjx5q47SKcJd08XsMd12uGA14hAOu8dK3-Jly4IVhWE','aaaa','bbbb')
 app.listen(
   {
     port: Number(process.env.PORT) || 4000,

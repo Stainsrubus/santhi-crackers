@@ -58,6 +58,7 @@ export const unitController = new Elysia({
           total,
         };
       } catch (error) {
+        console.error(error,"wdjiwhid");
         return {
           status: false,
           error,
